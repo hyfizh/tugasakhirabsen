@@ -1,0 +1,113 @@
+<?php
+
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\MahasiswaController;
+use Illuminate\Support\Facades\Route;
+
+// Redirect home to login/dashboard
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect('/dashboard');
+    }
+    return redirect()->route('login');
+});
+
+// Generic dashboard route for Breeze compatibility
+Route::get('/dashboard', function () {
+    $role = auth()->user()->role;
+    if ($role === 'admin') {
+        return redirect()->route('admin.dashboard');
+    } elseif ($role === 'mahasiswa') {
+        return redirect()->route('mahasiswa.dashboard');
+    }
+    abort(403);
+})->middleware(['auth'])->name('dashboard');
+
+// --- ADMIN PORTAL ROUTES ---
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+
+    // Kelas CRUD
+    Route::get('/kelas', [AdminController::class, 'indexKelas'])->name('kelas.index');
+    Route::post('/kelas', [AdminController::class, 'storeKelas'])->name('kelas.store');
+    Route::put('/kelas/{kelas}', [AdminController::class, 'updateKelas'])->name('kelas.update');
+    Route::delete('/kelas/{kelas}', [AdminController::class, 'destroyKelas'])->name('kelas.destroy');
+
+    // Dosen CRUD
+    Route::get('/dosen', [AdminController::class, 'indexDosen'])->name('dosen.index');
+    Route::post('/dosen', [AdminController::class, 'storeDosen'])->name('dosen.store');
+    Route::put('/dosen/{dosen}', [AdminController::class, 'updateDosen'])->name('dosen.update');
+    Route::delete('/dosen/{dosen}', [AdminController::class, 'destroyDosen'])->name('dosen.destroy');
+
+    // Mahasiswa CRUD
+    Route::get('/mahasiswa', [AdminController::class, 'indexMahasiswa'])->name('mahasiswa.index');
+    Route::post('/mahasiswa', [AdminController::class, 'storeMahasiswa'])->name('mahasiswa.store');
+    Route::put('/mahasiswa/{mahasiswa}', [AdminController::class, 'updateMahasiswa'])->name('mahasiswa.update');
+    Route::delete('/mahasiswa/{mahasiswa}', [AdminController::class, 'destroyMahasiswa'])->name('mahasiswa.destroy');
+    Route::post('/mahasiswa/{mahasiswa}/reset-password', [AdminController::class, 'resetPasswordMahasiswa'])->name('mahasiswa.reset-password');
+
+    // Mata Kuliah CRUD
+    Route::get('/matakuliah', [AdminController::class, 'indexMataKuliah'])->name('matakuliah.index');
+    Route::post('/matakuliah', [AdminController::class, 'storeMataKuliah'])->name('matakuliah.store');
+    Route::put('/matakuliah/{matakuliah}', [AdminController::class, 'updateMataKuliah'])->name('matakuliah.update');
+    Route::delete('/matakuliah/{matakuliah}', [AdminController::class, 'destroyMataKuliah'])->name('matakuliah.destroy');
+
+    // Jadwal CRUD
+    Route::get('/jadwal', [AdminController::class, 'indexJadwal'])->name('jadwal.index');
+    Route::post('/jadwal', [AdminController::class, 'storeJadwal'])->name('jadwal.store');
+    Route::put('/jadwal/{jadwal}', [AdminController::class, 'updateJadwal'])->name('jadwal.update');
+    Route::delete('/jadwal/{jadwal}', [AdminController::class, 'destroyJadwal'])->name('jadwal.destroy');
+
+    // RFID Scanning
+    Route::get('/rfid/scan', [AdminController::class, 'batchScanRfid'])->name('rfid.scan');
+    Route::post('/rfid/assign', [AdminController::class, 'assignRfid'])->name('rfid.assign');
+    Route::get('/rfid/clear', [AdminController::class, 'clearScannedRfid'])->name('rfid.clear');
+
+    // Laporan Kompen
+    Route::get('/laporan/kompen', [AdminController::class, 'laporanKompen'])->name('laporan.kompen');
+
+    // Laporan Rekap Absen untuk Dicetak
+    Route::get('/laporan/rekap', [AdminController::class, 'rekapAbsen'])->name('laporan.rekap');
+
+    // Cetak & Download Surat Peringatan 1, 2, atau 3 (DomPDF)
+    Route::get('/laporan/cetak-sp/{mahasiswa}', [AdminController::class, 'cetakSp'])->name('laporan.cetak-sp');
+    Route::get('/laporan/download-sp-pdf/{mahasiswa}', [AdminController::class, 'downloadSpPdf'])->name('laporan.download-sp-pdf');
+
+    // Audit Logs
+    Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
+
+    // Perangkat IoT
+    Route::get('/perangkat', [AdminController::class, 'indexPerangkat'])->name('perangkat.index');
+
+    // Settings
+    Route::get('/settings', [AdminController::class, 'settings'])->name('settings');
+    Route::post('/settings', [AdminController::class, 'updateSettings'])->name('settings.update');
+
+    // Permohonan Ganti Foto Mahasiswa
+    Route::get('/permohonan-foto', [AdminController::class, 'indexPermohonanFoto'])->name('permohonan-foto.index');
+    Route::post('/permohonan-foto/{id}/approve', [AdminController::class, 'approvePermohonanFoto'])->name('permohonan-foto.approve');
+    Route::post('/permohonan-foto/{id}/reject', [AdminController::class, 'rejectPermohonanFoto'])->name('permohonan-foto.reject');
+});
+
+// --- MAHASISWA PORTAL ROUTES ---
+Route::middleware(['auth', 'role:mahasiswa'])->prefix('mahasiswa')->group(function () {
+    // Forced change password routes (must be bypassed from ForceChangePassword middleware)
+    Route::get('/change-password', [MahasiswaController::class, 'showChangePasswordForm'])->name('password.change');
+    Route::post('/change-password', [MahasiswaController::class, 'updatePassword'])->name('password.change.update');
+
+    // Protected student actions
+    Route::middleware(['force_change_password'])->group(function () {
+        Route::get('/dashboard', [MahasiswaController::class, 'dashboard'])->name('mahasiswa.dashboard');
+        Route::get('/profile', [MahasiswaController::class, 'showProfileForm'])->name('mahasiswa.profile.form');
+        Route::put('/profile', [MahasiswaController::class, 'updateProfile'])->name('mahasiswa.profile.update');
+        Route::get('/face', [MahasiswaController::class, 'showFaceUpload'])->name('mahasiswa.face.form');
+        Route::post('/face', [MahasiswaController::class, 'updateFace'])->name('mahasiswa.face.update');
+        Route::delete('/face', [MahasiswaController::class, 'deleteFace'])->name('mahasiswa.face.delete');
+        Route::post('/request-photo-change', [MahasiswaController::class, 'requestPhotoChange'])->name('mahasiswa.request-photo-change');
+        Route::post('/face/verify-python', [MahasiswaController::class, 'verifyFacePython'])->name('mahasiswa.face.verify-python');
+        Route::get('/riwayat', [MahasiswaController::class, 'riwayatAbsen'])->name('mahasiswa.riwayat');
+    });
+});
+
+require __DIR__.'/auth.php';
