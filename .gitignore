@@ -5,10 +5,19 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/public/*
+!/storage/app/public/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
 /vendor
 .env
 .env.backup
 .env.production
+.env.local
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -21,3 +30,13 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+.DS_Store
+Thumbs.db
+
+# Executables & Temporary Scripts
+*.exe
+*.tmp
+*.bak
+*.old
+__pycache__/
+*.pyc

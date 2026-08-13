@@ -435,12 +435,19 @@
                         @error('kelas_id') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
+                    <div class="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 flex items-start space-x-2.5">
+                        <i class="fa-solid fa-circle-info text-indigo-500 text-sm mt-0.5"></i>
+                        <div class="leading-relaxed">
+                            <strong>Pendaftaran Administrasi Dasar:</strong> Setelah data disimpan, registrasi fisik <strong>RFID Tag</strong> &amp; <strong>Foto Biometrik Wajah</strong> dilakukan terpisah via menu <a href="{{ route('admin.iot-device.index') }}" class="font-bold underline text-indigo-700 hover:text-indigo-900">Stasiun Registrasi Sensor IoT</a>.
+                        </div>
+                    </div>
+
                     <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
                         <button type="button" @click="openAddModal = false" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
                             Batal
                         </button>
                         <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md hover:shadow-lg transition-all">
-                            Simpan Mahasiswa
+                            Simpan Data Administrasi
                         </button>
                     </div>
                 </form>
@@ -464,7 +471,7 @@
                     </button>
                 </div>
 
-                <form :action="'/admin/mahasiswa/' + editId" method="POST" class="p-6 space-y-4">
+                <form :action="'/admin/mahasiswa/' + editId" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="id" :value="editId">
@@ -508,8 +515,47 @@
                         </div>
                     </div>
 
+                    <!-- WebRTC Camera Capture Section for Admin Edit Mahasiswa -->
+                    <div class="space-y-2 pt-2 border-t border-slate-100">
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                            <i class="fa-solid fa-camera text-indigo-500 mr-1"></i> Perbarui Foto Biometrik Wajah
+                        </label>
+                        
+                        <div class="bg-slate-900 rounded-xl p-3 text-center space-y-2 relative overflow-hidden">
+                            <video id="admin-edit-webcam" autoplay playsinline class="hidden w-full max-h-40 rounded-lg object-cover mx-auto -scale-x-100 border border-slate-700"></video>
+                            <canvas id="admin-edit-canvas" class="hidden"></canvas>
+                            <img id="admin-edit-preview" class="hidden w-full max-h-40 rounded-lg object-cover mx-auto border border-slate-700 shadow-md">
+                            
+                            <div id="admin-edit-placeholder" class="py-4 text-slate-400 space-y-1">
+                                <i class="fa-solid fa-camera-retro text-2xl"></i>
+                                <p class="text-[11px] font-semibold">Webcam Live Selfie Belum Aktif</p>
+                            </div>
+
+                            <div class="flex items-center justify-center space-x-2">
+                                <button type="button" onclick="startAdminEditWebcam()" id="btn-admin-edit-start" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow transition-all inline-flex items-center">
+                                    <i class="fa-solid fa-video mr-1.5"></i> Buka Kamera Live
+                                </button>
+                                <button type="button" onclick="captureAdminEditSnapshot()" id="btn-admin-edit-capture" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow transition-all inline-flex items-center">
+                                    <i class="fa-solid fa-circle-dot mr-1.5"></i> Ambil Foto Snapshot
+                                </button>
+                                <button type="button" onclick="retakeAdminEditSnapshot()" id="btn-admin-edit-retake" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow transition-all inline-flex items-center">
+                                    <i class="fa-solid fa-rotate-left mr-1.5"></i> Foto Ulang
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Hidden Base64 Input -->
+                        <input type="hidden" name="foto_wajah_base64" id="admin_edit_foto_wajah_base64">
+
+                        <!-- File Input Fallback -->
+                        <div>
+                            <label for="edit_foto_wajah" class="block text-[11px] font-medium text-slate-500 mb-1">Atau Unggah File Foto Baru (JPG/PNG):</label>
+                            <input type="file" name="foto_wajah" id="edit_foto_wajah" accept="image/*" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer">
+                        </div>
+                    </div>
+
                     <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-                        <button type="button" @click="openEditModal = false" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
+                        <button type="button" @click="openEditModal = false; stopAdminEditWebcam();" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
                             Batal
                         </button>
                         <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md hover:shadow-lg transition-all">
@@ -519,6 +565,140 @@
                 </form>
             </div>
         </div>
+
+        <!-- WebRTC JavaScript for Admin Webcam Selfie -->
+        <script>
+            let adminAddStream = null;
+            let adminEditStream = null;
+
+            async function startAdminAddWebcam() {
+                try {
+                    stopAdminAddWebcam();
+                    adminAddStream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' }
+                    });
+                    const video = document.getElementById('admin-add-webcam');
+                    const placeholder = document.getElementById('admin-add-placeholder');
+                    const preview = document.getElementById('admin-add-preview');
+                    
+                    video.srcObject = adminAddStream;
+                    video.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    preview.classList.add('hidden');
+
+                    document.getElementById('btn-admin-add-start').classList.add('hidden');
+                    document.getElementById('btn-admin-add-capture').classList.remove('hidden');
+                    document.getElementById('btn-admin-add-retake').classList.add('hidden');
+                } catch (err) {
+                    alert('Gagal mengakses kamera: ' + err.message + '. Pastikan izin kamera telah diberikan pada browser.');
+                }
+            }
+
+            function captureAdminAddSnapshot() {
+                const video = document.getElementById('admin-add-webcam');
+                const canvas = document.getElementById('admin-add-canvas');
+                const preview = document.getElementById('admin-add-preview');
+                const hiddenInput = document.getElementById('admin_add_foto_wajah_base64');
+
+                if (!video || !adminAddStream) return;
+
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 640;
+                const ctx = canvas.getContext('2d');
+
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const base64Data = canvas.toDataURL('image/jpeg', 0.9);
+                hiddenInput.value = base64Data;
+
+                preview.src = base64Data;
+                preview.classList.remove('hidden');
+                video.classList.add('hidden');
+
+                document.getElementById('btn-admin-add-capture').classList.add('hidden');
+                document.getElementById('btn-admin-add-retake').classList.remove('hidden');
+
+                stopAdminAddWebcam();
+            }
+
+            function retakeAdminAddSnapshot() {
+                document.getElementById('admin_add_foto_wajah_base64').value = '';
+                startAdminAddWebcam();
+            }
+
+            function stopAdminAddWebcam() {
+                if (adminAddStream) {
+                    adminAddStream.getTracks().forEach(track => track.stop());
+                    adminAddStream = null;
+                }
+            }
+
+            async function startAdminEditWebcam() {
+                try {
+                    stopAdminEditWebcam();
+                    adminEditStream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' }
+                    });
+                    const video = document.getElementById('admin-edit-webcam');
+                    const placeholder = document.getElementById('admin-edit-placeholder');
+                    const preview = document.getElementById('admin-edit-preview');
+                    
+                    video.srcObject = adminEditStream;
+                    video.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    preview.classList.add('hidden');
+
+                    document.getElementById('btn-admin-edit-start').classList.add('hidden');
+                    document.getElementById('btn-admin-edit-capture').classList.remove('hidden');
+                    document.getElementById('btn-admin-edit-retake').classList.add('hidden');
+                } catch (err) {
+                    alert('Gagal mengakses kamera: ' + err.message + '. Pastikan izin kamera telah diberikan pada browser.');
+                }
+            }
+
+            function captureAdminEditSnapshot() {
+                const video = document.getElementById('admin-edit-webcam');
+                const canvas = document.getElementById('admin-edit-canvas');
+                const preview = document.getElementById('admin-edit-preview');
+                const hiddenInput = document.getElementById('admin_edit_foto_wajah_base64');
+
+                if (!video || !adminEditStream) return;
+
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 640;
+                const ctx = canvas.getContext('2d');
+
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const base64Data = canvas.toDataURL('image/jpeg', 0.9);
+                hiddenInput.value = base64Data;
+
+                preview.src = base64Data;
+                preview.classList.remove('hidden');
+                video.classList.add('hidden');
+
+                document.getElementById('btn-admin-edit-capture').classList.add('hidden');
+                document.getElementById('btn-admin-edit-retake').classList.remove('hidden');
+
+                stopAdminEditWebcam();
+            }
+
+            function retakeAdminEditSnapshot() {
+                document.getElementById('admin_edit_foto_wajah_base64').value = '';
+                startAdminEditWebcam();
+            }
+
+            function stopAdminEditWebcam() {
+                if (adminEditStream) {
+                    adminEditStream.getTracks().forEach(track => track.stop());
+                    adminEditStream = null;
+                }
+            }
+        </script>
 
     </div>
 </x-admin-layout>

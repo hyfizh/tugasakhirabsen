@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MahasiswaController;
+use App\Http\Controllers\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
 
 // Redirect home to login/dashboard
@@ -64,15 +65,21 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/rfid/assign', [AdminController::class, 'assignRfid'])->name('rfid.assign');
     Route::get('/rfid/clear', [AdminController::class, 'clearScannedRfid'])->name('rfid.clear');
 
+    // Stasiun Registrasi Sensor IoT (RFID Tag & Biometrik Wajah WebRTC)
+    Route::get('/iot-device', [AdminController::class, 'indexIotDevice'])->name('iot-device.index');
+    Route::post('/iot-device/assign', [AdminController::class, 'assignIotDevice'])->name('iot-device.assign');
+
     // Laporan Kompen
     Route::get('/laporan/kompen', [AdminController::class, 'laporanKompen'])->name('laporan.kompen');
 
-    // Laporan Rekap Absen untuk Dicetak
+    // Laporan Rekap Absen untuk Dicetak & Ubah Status Absensi (Sakit/Izin/Hadir/Alpa)
     Route::get('/laporan/rekap', [AdminController::class, 'rekapAbsen'])->name('laporan.rekap');
+    Route::post('/absensi/update-status', [AdminController::class, 'updateAbsensiStatus'])->name('absensi.update-status');
 
-    // Cetak & Download Surat Peringatan 1, 2, atau 3 (DomPDF)
+    // Cetak, Download & Kirim Email Surat Peringatan (SP 1, 2, 3)
     Route::get('/laporan/cetak-sp/{mahasiswa}', [AdminController::class, 'cetakSp'])->name('laporan.cetak-sp');
     Route::get('/laporan/download-sp-pdf/{mahasiswa}', [AdminController::class, 'downloadSpPdf'])->name('laporan.download-sp-pdf');
+    Route::post('/laporan/kirim-sp-email/{mahasiswa}', [AdminController::class, 'kirimSpEmail'])->name('laporan.kirim-sp-email');
 
     // Audit Logs
     Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
@@ -101,12 +108,11 @@ Route::middleware(['auth', 'role:mahasiswa'])->prefix('mahasiswa')->group(functi
         Route::get('/dashboard', [MahasiswaController::class, 'dashboard'])->name('mahasiswa.dashboard');
         Route::get('/profile', [MahasiswaController::class, 'showProfileForm'])->name('mahasiswa.profile.form');
         Route::put('/profile', [MahasiswaController::class, 'updateProfile'])->name('mahasiswa.profile.update');
-        Route::get('/face', [MahasiswaController::class, 'showFaceUpload'])->name('mahasiswa.face.form');
-        Route::post('/face', [MahasiswaController::class, 'updateFace'])->name('mahasiswa.face.update');
-        Route::delete('/face', [MahasiswaController::class, 'deleteFace'])->name('mahasiswa.face.delete');
-        Route::post('/request-photo-change', [MahasiswaController::class, 'requestPhotoChange'])->name('mahasiswa.request-photo-change');
-        Route::post('/face/verify-python', [MahasiswaController::class, 'verifyFacePython'])->name('mahasiswa.face.verify-python');
         Route::get('/riwayat', [MahasiswaController::class, 'riwayatAbsen'])->name('mahasiswa.riwayat');
+
+        // Email Verification Routes
+        Route::post('/email/send-otp', [EmailVerificationController::class, 'sendOtp'])->name('mahasiswa.email.send-otp');
+        Route::post('/email/verify-otp', [EmailVerificationController::class, 'verifyOtp'])->name('mahasiswa.email.verify-otp');
     });
 });
 

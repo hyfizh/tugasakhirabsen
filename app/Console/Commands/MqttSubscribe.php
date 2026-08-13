@@ -108,37 +108,70 @@ class MqttSubscribe extends Command
             // Scenario 2: Access granted / attendance check-in
             if ($tipeLog === 'ACCESS_GRANTED') {
                 $mahasiswaId = $payload['mahasiswa_id'] ?? null;
-                $jadwalId = $payload['jadwal_id'] ?? null;
+                $rfidUid = $payload['rfid_uid'] ?? $payload['uid'] ?? null;
 
-                if (!$mahasiswaId || !$jadwalId) {
-                    $this->warn("Missing mahasiswa_id or jadwal_id in payload.");
+                $mahasiswa = null;
+                if ($mahasiswaId) {
+                    $mahasiswa = Mahasiswa::find($mahasiswaId);
+                } elseif ($rfidUid) {
+                    $mahasiswa = Mahasiswa::where('rfid_uid', $rfidUid)->first();
+                }
+
+                if (!$mahasiswa) {
+                    $this->warn("Mahasiswa tidak ditemukan untuk payload ACCESS_GRANTED.");
                     return;
                 }
 
-                $mahasiswa = Mahasiswa::findOrFail($mahasiswaId);
-                $currentJam = $this->getCurrentJamPelajaran();
+                $jadwalId = $payload['jadwal_id'] ?? null;
+                if (!$jadwalId) {
+                    $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                    $todayName = $days[date('w')];
+                    $jadwal = Jadwal::where('kelas_id', $mahasiswa->kelas_id)->where('hari', $todayName)->first()
+                        ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first();
+                    $jadwalId = $jadwal?->id;
+                }
+
+                if (!$jadwalId) {
+                    $this->warn("Jadwal tidak ditemukan untuk kelas mahasiswa ID: {$mahasiswa->id}");
+                    return;
+                }
 
                 $absensi = Absensi::updateOrCreate(
                     [
                         'mahasiswa_id' => $mahasiswa->id,
-                        'jadwal_id' => $jadwalId,
-                        'tanggal' => date('Y-m-d'),
+                        'jadwal_id'    => $jadwalId,
+                        'tanggal'      => date('Y-m-d'),
                     ],
                     [
-                        'jam_pelajaran_ke' => $currentJam,
-                        'status' => 'H',
-                        'waktu_tap_rfid' => date('Y-m-d H:i:s'),
-                        'waktu_verifikasi_wajah' => date('Y-m-d H:i:s'),
+                        'jam_pelajaran_ke'       => 1,
+                        'status'                 => 'H',
+                        'waktu_tap_rfid'         => now(),
+                        'waktu_verifikasi_wajah' => now(),
                     ]
                 );
 
+                // Kirim email notifikasi presensi berhasil jika email mahasiswa terverifikasi
+                $emailTarget = $mahasiswa->email ?? $mahasiswa->user?->email;
+                $isVerified  = $mahasiswa->user && $mahasiswa->user->email_verified_at !== null;
+
+                if (!empty($emailTarget) && $isVerified) {
+                    try {
+                        $jadwalObj = Jadwal::with('mataKuliah')->find($jadwalId);
+                        \Illuminate\Support\Facades\Mail::to($emailTarget)->send(new \App\Mail\AbsenSuksesMail($mahasiswa, $absensi, $jadwalObj));
+                        $this->info("📧 Email notifikasi absensi berhasil dikirim ke: {$emailTarget}");
+                    } catch (\Exception $e) {
+                        Log::error("Gagal mengirim email AbsenSuksesMail via MQTT: " . $e->getMessage());
+                    }
+                }
+
                 AuditLog::create([
-                    'tipe_log' => 'ACCESS_GRANTED',
-                    'deskripsi' => "Akses Diberikan (MQTT): {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) berhasil absen hadir.",
+                    'tipe_log'   => 'ACCESS_GRANTED',
+                    'deskripsi'  => "Akses Diberikan (MQTT): {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) berhasil absen hadir.",
                     'ip_address' => 'MQTT Broker',
                 ]);
 
-                $this->info("Attendance recorded for {$mahasiswa->nama_lengkap}");
+                $this->info("✅ ABSENSI BERHASIL DISIMPAN KE DB! Mahasiswa ID: {$mahasiswa->id}");
+                $this->info("Attendance recorded for {$mahasiswa->nama_lengkap} [Hadir Tepat Waktu]");
             }
         } catch (\Exception $e) {
             $this->error("Failed to process MQTT payload: " . $e->getMessage());
@@ -149,20 +182,20 @@ class MqttSubscribe extends Command
     /**
      * Get current school lesson hour slot.
      */
-    private function getCurrentJamPelajaran(): int
+    private function getCurrentJamPelajaran(): ?int
     {
         $time = date('H:i');
         $hours = [
-            1  => ['07:00', '07:50'],
-            2  => ['07:50', '08:40'],
-            3  => ['08:40', '09:30'],
-            4  => ['09:40', '10:30'],
-            5  => ['10:30', '11:20'],
-            6  => ['11:20', '12:10'],
-            7  => ['12:30', '13:20'],
-            8  => ['13:20', '14:10'],
-            9  => ['14:10', '15:00'],
-            10 => ['15:00', '15:50'],
+            1  => ['07:00', '08:20'],
+            2  => ['08:20', '09:10'],
+            3  => ['09:10', '10:00'],
+            4  => ['10:10', '11:00'],
+            5  => ['11:00', '11:50'],
+            6  => ['11:50', '12:40'],
+            7  => ['13:30', '14:20'],
+            8  => ['14:20', '15:10'],
+            9  => ['15:10', '16:00'],
+            10 => ['16:00', '16:50'],
         ];
 
         foreach ($hours as $slot => $range) {
@@ -170,6 +203,51 @@ class MqttSubscribe extends Command
                 return $slot;
             }
         }
-        return 1;
+
+        // Diluar jam perkuliahan resmi
+        return null;
+    }
+
+    /**
+     * Hitung Status Kehadiran (Hadir = Tepat Waktu, T = Terlambat > 15 Menit)
+     */
+    private function calculateAttendanceStatus(int $jamPelajaran): string
+    {
+        $time = date('H:i');
+        $sessionTimes = [
+            1  => ['start' => '07:30', 'end' => '08:20'],
+            2  => ['start' => '08:20', 'end' => '09:10'],
+            3  => ['start' => '09:10', 'end' => '10:00'],
+            4  => ['start' => '10:10', 'end' => '11:00'],
+            5  => ['start' => '11:00', 'end' => '11:50'],
+            6  => ['start' => '11:50', 'end' => '12:40'],
+            7  => ['start' => '13:30', 'end' => '14:20'],
+            8  => ['start' => '14:20', 'end' => '15:10'],
+            9  => ['start' => '15:10', 'end' => '16:00'],
+            10 => ['start' => '16:00', 'end' => '16:50'],
+        ];
+
+        if (!isset($sessionTimes[$jamPelajaran])) {
+            return 'H';
+        }
+
+        $startTime = $sessionTimes[$jamPelajaran]['start'];
+        $endTime   = $sessionTimes[$jamPelajaran]['end'];
+
+        // 1. Window 15 Menit Awal (Dimulai 15 menit sebelum jam kelas sampai 15 menit setelah kelas mulai)
+        $earlyStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
+        $earlyEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
+
+        // 2. Window 15 Menit Akhir (Dimulai 15 menit sebelum kelas selesai sampai 15 menit setelah kelas selesai)
+        $lateStart  = date('H:i', strtotime($endTime . ' - 15 minutes'));
+        $lateEnd    = date('H:i', strtotime($endTime . ' + 15 minutes'));
+
+        // Jika tap berada di Window 15 Menit Awal ATAU Window 15 Menit Akhir
+        if (($time >= $earlyStart && $time <= $earlyEnd) || ($time >= $lateStart && $time <= $lateEnd)) {
+            return 'H'; // Hadir Tepat Waktu / Presensi Valid Sesi
+        }
+
+        // Jika tap di tengah-tengah rentang waktu perkuliahan (> 15 menit awal & < 15 menit akhir)
+        return 'T'; // Terlambat
     }
 }

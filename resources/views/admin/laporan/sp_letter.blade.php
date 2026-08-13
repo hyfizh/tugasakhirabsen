@@ -370,6 +370,12 @@
             <a href="{{ route('admin.laporan.download-sp-pdf', $mahasiswa->id) }}" target="_blank" class="btn-action" style="background-color: #059669; color: white;">
                 <i class="fa-solid fa-file-pdf"></i> Download PDF (DomPDF)
             </a>
+            <form action="{{ route('admin.laporan.kirim-sp-email', $mahasiswa->id) }}" method="POST" style="display: inline;">
+                @csrf
+                <button type="submit" onclick="return confirm('Kirim Surat Peringatan ({{ $spTitle }}) ke email {{ $mahasiswa->nama_lengkap }}?')" class="btn-action" style="background-color: #d97706; color: white;">
+                    <i class="fa-solid fa-paper-plane"></i> Kirim Email SP
+                </button>
+            </form>
         </div>
     </div>
 

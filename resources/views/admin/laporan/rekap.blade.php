@@ -47,7 +47,8 @@
     <div class="space-y-6 pb-6" x-data="{
         selectedKelas: '{{ $selectedKelas->nama_kelas ?? 'Teknologi Informasi 3A' }}',
         selectedMatkul: 'Rancang Bangun IoT',
-        selectedPeriode: 'Oktober 2023'
+        selectedPeriode: 'Oktober 2023',
+        openModal: false
     }">
         
         <!-- Printable Kop Surat Header for PDF Export -->
@@ -69,14 +70,14 @@
             </div>
         </div>
 
-        <!-- Filter Bar Card (3 Dropdowns + Filter Button) (Screen Only) -->
+        <!-- Filter Bar Card (3 Dropdowns + Auto Submit) (Screen Only) -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 no-print">
-            <form action="{{ route('admin.laporan.rekap') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+            <form action="{{ route('admin.laporan.rekap') }}" method="GET" id="rekap-filter-form" class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
                 
                 <!-- KELAS -->
                 <div class="sm:col-span-3">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">KELAS</label>
-                    <select name="kelas_id" id="kelas_id" x-model="selectedKelas" 
+                    <select name="kelas_id" id="kelas_id" onchange="this.form.submit()" 
                             class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
                         @foreach ($kelas as $k)
                             <option value="{{ $k->id }}" {{ $selectedKelasId == $k->id ? 'selected' : '' }}>
@@ -89,32 +90,41 @@
                 <!-- MATA KULIAH -->
                 <div class="sm:col-span-4">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MATA KULIAH</label>
-                    <select name="mata_kuliah_id" x-model="selectedMatkul"
+                    <select name="mata_kuliah_id" id="mata_kuliah_id" onchange="this.form.submit()"
                             class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
-                        <option value="Rancang Bangun IoT">Rancang Bangun IoT</option>
-                        <option value="Algoritma & Pemrograman">Algoritma & Pemrograman</option>
-                        <option value="Dasar Elektronika">Dasar Elektronika</option>
-                        <option value="Keamanan Jaringan">Keamanan Jaringan</option>
+                        <option value="">-- Semua Mata Kuliah --</option>
+                        @foreach ($mataKuliahList as $mk)
+                            <option value="{{ $mk->id }}" {{ (string)$selectedMatkulId === (string)$mk->id ? 'selected' : '' }}>
+                                {{ $mk->kode_mk }} - {{ $mk->nama_mk }}
+                            </option>
+                        @endforeach
                     </select>
                 </div>
 
-                <!-- PERIODE BULAN -->
-                <div class="sm:col-span-3">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">PERIODE BULAN</label>
-                    <select name="periode" x-model="selectedPeriode"
-                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
-                        <option value="Oktober 2023">Oktober 2023</option>
-                        <option value="November 2023">November 2023</option>
-                        <option value="Desember 2023">Desember 2023</option>
-                        <option value="Januari 2024">Januari 2024</option>
-                    </select>
-                </div>
-
-                <!-- Filter Button -->
+                <!-- BULAN -->
                 <div class="sm:col-span-2">
-                    <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center">
-                        <i class="fa-solid fa-filter mr-2 text-xs"></i> Filter
-                    </button>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">BULAN</label>
+                    <select name="bulan" id="bulan" onchange="this.form.submit()"
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
+                        @foreach ($monthsList as $num => $name)
+                            <option value="{{ $num }}" {{ (int)$bulan === (int)$num ? 'selected' : '' }}>
+                                {{ $name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- TAHUN -->
+                <div class="sm:col-span-3">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">TAHUN</label>
+                    <select name="tahun" id="tahun" onchange="this.form.submit()"
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
+                        @foreach ($yearsList as $y)
+                            <option value="{{ $y }}" {{ (int)$tahun === (int)$y ? 'selected' : '' }}>
+                                {{ $y }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
             </form>
         </div>
@@ -127,12 +137,15 @@
                 <div>
                     <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Preview Laporan</h3>
                     <p class="text-xs text-slate-500 font-medium mt-0.5">
-                        <span x-text="selectedKelas">{{ $selectedKelas->nama_kelas ?? 'TI-3A' }}</span> - <span x-text="selectedMatkul">Rancang Bangun IoT</span> - <span x-text="selectedPeriode">Oktober 2023</span>
+                        <span>{{ $selectedKelas->nama_kelas ?? 'TI-3A' }}</span> - Periode {{ $monthsList[$bulan] ?? '' }} {{ $tahun }}
                     </p>
                 </div>
 
-                <!-- Action Buttons Export PDF & Print Report -->
-                <div class="flex items-center space-x-2.5 no-print">
+                <!-- Action Buttons: Ubah Status Absensi (Sakit/Izin) & Export PDF -->
+                <div class="flex flex-wrap items-center gap-2.5 no-print">
+                    <button type="button" @click="openModal = true" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-sm hover:shadow-md transition-all inline-flex items-center">
+                        <i class="fa-solid fa-file-medical mr-2 text-sm"></i> Ubah Status Absensi (Sakit / Izin)
+                    </button>
                     <button onclick="window.print()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all inline-flex items-center shadow-sm">
                         <i class="fa-solid fa-file-pdf text-rose-500 mr-2 text-sm"></i> Export PDF
                     </button>
@@ -232,6 +245,78 @@
                     <div class="h-20"></div>
                     <p class="font-bold underline">Admin EduAttend IoT</p>
                     <p>NIP/NIDN. System Generated</p>
+                </div>
+        <!-- MODAL UBAH STATUS ABSENSI MAHASISWA (SURAT SAKIT / IZIN) -->
+        <div x-show="openModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <!-- Backdrop -->
+                <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" @click="openModal = false"></div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                <!-- Modal Panel -->
+                <div x-show="openModal" x-transition class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full p-6 space-y-5 border border-slate-100">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
+                                <i class="fa-solid fa-file-medical text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-extrabold text-slate-900">Ubah Status Absensi (Surat Izin/Sakit)</h3>
+                                <p class="text-xs text-slate-500 font-medium">Ubah status Alpa menjadi Sakit (S) atau Izin (I) berdasarkan surat resmi.</p>
+                            </div>
+                        </div>
+                        <button type="button" @click="openModal = false" class="text-slate-400 hover:text-slate-600">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+
+                    <form action="{{ route('admin.absensi.update-status') }}" method="POST" class="space-y-4">
+                        @csrf
+                        <!-- Pilih Mahasiswa -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Pilih Mahasiswa</label>
+                            <select name="mahasiswa_id" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                                @foreach ($students as $mhs)
+                                    <option value="{{ $mhs->id }}">{{ $mhs->nim }} - {{ $mhs->nama_lengkap }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Tanggal Absensi -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tanggal Absensi</label>
+                            <input type="date" name="tanggal" value="{{ date('Y-m-d') }}" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                        </div>
+
+                        <!-- Status Baru -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Status Kehadiran Baru</label>
+                            <select name="status" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                                <option value="S">Sakit (S) — Berdasarkan Surat Dokter</option>
+                                <option value="I">Izin (I) — Berdasarkan Surat Izin Resmi</option>
+                                <option value="H">Hadir Tepat Waktu (H)</option>
+                                <option value="T">Terlambat (T)</option>
+                                <option value="A">Alpa (A)</option>
+                            </select>
+                        </div>
+
+                        <!-- Keterangan / Nomor Surat -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Keterangan / Nomor Surat (Opsional)</label>
+                            <input type="text" name="keterangan" placeholder="Contoh: Surat Dokter No. 123/SD/2023" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                        </div>
+
+                        <!-- Modal Actions -->
+                        <div class="pt-3 flex items-center justify-end space-x-3 border-t border-slate-100">
+                            <button type="button" @click="openModal = false" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+                                Batal
+                            </button>
+                            <button type="submit" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md transition-all">
+                                Simpan Perubahan Status
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

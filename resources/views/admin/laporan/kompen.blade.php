@@ -227,14 +227,17 @@
                                      <td class="py-4 px-6 text-right no-print">
                                          <div class="flex items-center justify-end space-x-2">
                                              @if ($data->sp_level >= 1)
-                                                 <a href="{{ route('admin.laporan.cetak-sp', $data->id) }}" target="_blank" 
-                                                    class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-[11px] rounded-xl inline-flex items-center border border-indigo-200/80 transition-all">
-                                                     <i class="fa-solid fa-eye mr-1"></i> Cetak Browser
-                                                 </a>
                                                  <a href="{{ route('admin.laporan.download-sp-pdf', $data->id) }}" target="_blank" 
                                                     class="px-3 py-1.5 {{ $isSp3 ? 'bg-rose-800 hover:bg-rose-900 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white' }} font-extrabold text-[11px] rounded-xl inline-flex items-center shadow-sm transition-all">
                                                      <i class="fa-solid fa-file-pdf mr-1"></i> Download PDF
                                                  </a>
+                                                 <form action="{{ route('admin.laporan.kirim-sp-email', $data->id) }}" method="POST" class="inline">
+                                                     @csrf
+                                                     <button type="submit" onclick="return confirm('Kirim Surat Peringatan ({{ $data->sp_level }}) ke email {{ $data->nama_lengkap }}?')" 
+                                                             class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] rounded-xl inline-flex items-center shadow-sm transition-all">
+                                                         <i class="fa-solid fa-paper-plane mr-1"></i> Kirim Email
+                                                     </button>
+                                                 </form>
                                              @endif
                                          </div>
                                      </td>

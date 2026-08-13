@@ -52,11 +52,26 @@
         }
     </style>
 </head>
-<body class="bg-dashboard text-slate-800 antialiased font-sans h-screen overflow-hidden">
-    <div class="h-screen w-screen flex overflow-hidden bg-dashboard" x-data="{ sidebarOpen: true }">
+<body class="bg-dashboard text-slate-800 antialiased font-sans h-screen overflow-hidden" x-data="{ isMobile: window.innerWidth < 768 }" @resize.window="isMobile = window.innerWidth < 768">
+    <div class="h-screen w-screen flex overflow-hidden bg-dashboard" x-data="{ sidebarOpen: window.innerWidth >= 768 }">
         
-        <!-- Left Sidebar Navigation (Fixed Position) -->
-        <aside :class="sidebarOpen ? 'w-64' : 'w-20'" class="sidebar-bg text-slate-700 flex-shrink-0 transition-all duration-300 ease-in-out flex flex-col z-20 border-r border-slate-200/80 shadow-sm h-full" style="height: 100vh; flex-shrink: 0; position: relative;">
+        <!-- Mobile Sidebar Dark Backdrop Overlay -->
+        <div x-show="sidebarOpen && isMobile" 
+             @click="sidebarOpen = false" 
+             x-transition:enter="transition-opacity ease-linear duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition-opacity ease-linear duration-300"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 md:hidden" style="display: none;"></div>
+
+        <!-- Left Sidebar Navigation (Responsive Mobile Drawer & Desktop Fixed Collapsible) -->
+        <aside :class="{
+                   'w-64 translate-x-0': sidebarOpen,
+                   '-translate-x-full md:translate-x-0 md:w-20': !sidebarOpen
+               }" 
+               class="fixed md:static inset-y-0 left-0 z-40 sidebar-bg text-slate-700 flex-shrink-0 transition-transform md:transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200/80 shadow-2xl md:shadow-sm h-full" style="height: 100vh;">
             
             <!-- Brand Logo Header -->
             <div class="h-20 flex items-center justify-between px-6 border-b border-slate-100 flex-shrink-0">
@@ -133,17 +148,17 @@
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden" style="flex: 1 1 0%; display: flex; flex-direction: column; min-width: 0; overflow: hidden; height: 100%;">
             
             <!-- Topbar Header -->
-            <header class="h-20 bg-dashboard flex items-center justify-between px-8 z-10 flex-shrink-0">
+            <header class="h-20 bg-dashboard flex items-center justify-between px-4 sm:px-8 z-10 flex-shrink-0">
                 <!-- Title -->
-                <div class="flex items-center space-x-4">
-                    <button @click="sidebarOpen = !sidebarOpen" class="text-slate-600 focus:outline-none md:hidden">
+                <div class="flex items-center space-x-3 sm:space-x-4">
+                    <button @click="sidebarOpen = !sidebarOpen" class="text-slate-600 focus:outline-none md:hidden p-1">
                         <i class="fa-solid fa-bars text-xl"></i>
                     </button>
-                    <h1 class="text-2xl sm:text-3xl font-extrabold text-indigo-900 tracking-tight">EduAttend Student</h1>
+                    <h1 class="text-xl sm:text-3xl font-extrabold text-indigo-900 tracking-tight truncate">Absen TI Mahasiswa</h1>
                 </div>
 
                 <!-- Right Tools (Clock, Search, Profile) -->
-                <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-3 sm:space-x-6">
                     <!-- Live Clock Widget -->
                     <div class="hidden sm:flex items-center space-x-2 text-xs font-bold text-slate-500 bg-slate-200/50 px-3.5 py-1.5 rounded-full">
                         <i class="fa-regular fa-clock text-indigo-600"></i>
@@ -170,7 +185,7 @@
             </header>
 
             <!-- Main Scrollable Dashboard Content Area -->
-            <main class="flex-1 overflow-x-hidden overflow-y-auto px-8 py-6 space-y-6" style="height: calc(100vh - 5rem); max-height: calc(100vh - 5rem); overflow-y: auto;">
+            <main class="flex-1 overflow-x-hidden overflow-y-auto px-4 sm:px-8 py-4 sm:py-6 space-y-6" style="height: calc(100vh - 5rem); max-height: calc(100vh - 5rem); overflow-y: auto;">
                 <!-- SweetAlert2 Toast Notifications -->
                 <script>
                     document.addEventListener('DOMContentLoaded', function () {

@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <div class="w-full max-w-[440px] mx-auto bg-white rounded-[2.5rem] p-8 sm:p-10 shadow-[0_25px_60px_rgba(59,40,204,0.10)] border border-slate-100">
+    <div class="w-full max-w-[440px] mx-auto bg-white rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-xl sm:shadow-[0_25px_60px_rgba(59,40,204,0.10)] border border-slate-100">
         
         <!-- Header Brand Logo Badge -->
         <div class="flex flex-col items-center text-center space-y-3">

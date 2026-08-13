@@ -12,9 +12,11 @@ use App\Models\Absensi;
 use App\Models\AuditLog;
 use App\Models\SuratPeringatan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
@@ -169,51 +171,107 @@ class AdminController extends Controller
     public function storeMahasiswa(Request $request)
     {
         $request->validate([
-            'nim' => 'required|string|unique:mahasiswas,nim|unique:users,username',
-            'nama_lengkap' => 'required|string|max:100',
-            'kelas_id' => 'required|exists:kelas,id',
+            'nim'               => 'required|string|unique:mahasiswas,nim|unique:users,username',
+            'nama_lengkap'      => 'required|string|max:100',
+            'kelas_id'          => 'required|exists:kelas,id',
+            'email'             => 'nullable|email|unique:mahasiswas,email|unique:users,email',
+            'no_hp'             => 'nullable|string|max:20',
+            'rfid_uid'          => 'nullable|string|unique:mahasiswas,rfid_uid',
+            'foto_wajah_base64' => 'nullable|string',
+            'foto_wajah'        => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $email = $request->nim . '@student.pnp.ac.id';
+        // Set email, no_hp, and rfid_uid to null when empty so student completes profile & verifies email mandatorily
+        $email = $request->filled('email') ? trim($request->email) : null;
+        $noHp = $request->filled('no_hp') ? trim($request->no_hp) : null;
+        $rfidUid = $request->filled('rfid_uid') ? trim($request->rfid_uid) : null;
 
-        DB::transaction(function () use ($request, $email) {
+        DB::transaction(function () use ($request, $email, $noHp, $rfidUid) {
             $user = User::query()->create([
-                'username' => $request->nim,
-                'email' => $email,
-                'password' => Hash::make('12345678'),
-                'role' => 'mahasiswa',
+                'username'            => $request->nim,
+                'email'               => $email,
+                'password'            => Hash::make('12345678'),
+                'role'                => 'mahasiswa',
                 'is_password_changed' => false,
+                'email_verified_at'   => null,
             ]);
 
+            $path = null;
+            if ($request->filled('foto_wajah_base64')) {
+                $base64Image = $request->foto_wajah_base64;
+                if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+                    $data = substr($base64Image, strpos($base64Image, ',') + 1);
+                    $data = base64_decode($data);
+                    $ext = strtolower($type[1]) === 'png' ? 'png' : 'jpg';
+
+                    $filename = $request->nim . '_' . time() . '.' . $ext;
+                    $path = 'profiles/' . $filename;
+                    Storage::disk('public')->put($path, $data);
+                }
+            } elseif ($request->file('foto_wajah')) {
+                $file = $request->file('foto_wajah');
+                $filename = $request->nim . '_' . time() . '.' . $file->getClientOriginalExtension();
+                $path = $file->storeAs('profiles', $filename, 'public');
+            }
+
             Mahasiswa::query()->create([
-                'user_id' => $user->id,
-                'nim' => $request->nim,
-                'nama_lengkap' => $request->nama_lengkap,
-                'email' => $email,
-                'kelas_id' => $request->kelas_id,
+                'user_id'               => $user->id,
+                'nim'                   => $request->nim,
+                'nama_lengkap'          => $request->nama_lengkap,
+                'email'                 => $email,
+                'no_hp'                 => $noHp,
+                'rfid_uid'              => $rfidUid,
+                'kelas_id'              => $request->kelas_id,
+                'foto_wajah'            => $path,
+                'last_photo_updated_at' => $path ? now() : null,
             ]);
         });
 
-        return redirect()->route('admin.mahasiswa.index')->with('success', 'Mahasiswa berhasil ditambahkan.');
+        return redirect()->route('admin.mahasiswa.index')->with('success', 'Mahasiswa berhasil ditambahkan beserta foto biometrik wajah terdaftar.');
     }
 
     public function updateMahasiswa(Request $request, Mahasiswa $mahasiswa)
     {
         $request->validate([
-            'nim' => 'required|string|unique:mahasiswas,nim,' . $mahasiswa->id,
-            'nama_lengkap' => 'required|string|max:100',
-            'email' => 'required|email|unique:mahasiswas,email,' . $mahasiswa->id,
-            'no_hp' => 'nullable|string|max:20',
-            'kelas_id' => 'required|exists:kelas,id',
-            'rfid_uid' => 'nullable|string|unique:mahasiswas,rfid_uid,' . $mahasiswa->id,
+            'nim'               => 'required|string|unique:mahasiswas,nim,' . $mahasiswa->id,
+            'nama_lengkap'      => 'required|string|max:100',
+            'email'             => 'required|email|unique:mahasiswas,email,' . $mahasiswa->id,
+            'no_hp'             => 'nullable|string|max:20',
+            'kelas_id'          => 'required|exists:kelas,id',
+            'rfid_uid'          => 'nullable|string|unique:mahasiswas,rfid_uid,' . $mahasiswa->id,
+            'foto_wajah_base64' => 'nullable|string',
+            'foto_wajah'        => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $mahasiswa->update($request->only('nim', 'nama_lengkap', 'email', 'no_hp', 'kelas_id', 'rfid_uid'));
+        $updateData = $request->only('nim', 'nama_lengkap', 'email', 'no_hp', 'kelas_id', 'rfid_uid');
+
+        if ($request->filled('foto_wajah_base64')) {
+            $base64Image = $request->foto_wajah_base64;
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+                $data = substr($base64Image, strpos($base64Image, ',') + 1);
+                $data = base64_decode($data);
+                $ext = strtolower($type[1]) === 'png' ? 'png' : 'jpg';
+
+                $filename = $request->nim . '_' . time() . '.' . $ext;
+                $path = 'profiles/' . $filename;
+                Storage::disk('public')->put($path, $data);
+                $updateData['foto_wajah'] = $path;
+                $updateData['last_photo_updated_at'] = now();
+            }
+        } elseif ($request->file('foto_wajah')) {
+            $file = $request->file('foto_wajah');
+            $filename = $request->nim . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('profiles', $filename, 'public');
+            $updateData['foto_wajah'] = $path;
+            $updateData['last_photo_updated_at'] = now();
+        }
+
+        $mahasiswa->update($updateData);
         
         if ($mahasiswa->user) {
             $mahasiswa->user->update([
                 'username' => $request->nim,
-                'email' => $request->email
+                'email'    => $request->email
             ]);
         }
 
@@ -463,6 +521,92 @@ class AdminController extends Controller
         return redirect()->route('admin.rfid.scan')->with('success', 'Temp RFID UID cleared.');
     }
 
+    // --- STASIUN REGISTRASI SENSOR IOT (RFID TAG & BIOMETRIK WAJAH WEBRTC) ---
+    public function indexIotDevice()
+    {
+        $mahasiswas = Mahasiswa::with(['kelas', 'user'])->orderBy('nama_lengkap', 'asc')->get();
+        
+        // Mahasiswa yang belum melengkapi RFID UID atau Foto Wajah
+        $mahasiswasPending = Mahasiswa::with(['kelas', 'user'])
+            ->where(function($query) {
+                $query->whereNull('foto_wajah')
+                      ->orWhereNull('rfid_uid');
+            })
+            ->orderBy('nama_lengkap', 'asc')
+            ->get();
+
+        return view('admin.iot-device', compact('mahasiswas', 'mahasiswasPending'));
+    }
+
+    public function assignIotDevice(Request $request)
+    {
+        $request->validate([
+            'mahasiswa_id'      => 'required|exists:mahasiswas,id',
+            'rfid_uid'          => 'required|string|max:50',
+            'foto_wajah_base64' => 'required|string',
+        ]);
+
+        try {
+            $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
+
+            // Cek keunikan RFID UID jika dipakai oleh mahasiswa lain
+            $existingRfid = Mahasiswa::where('rfid_uid', trim($request->rfid_uid))
+                ->where('id', '!=', $mahasiswa->id)
+                ->first();
+
+            if ($existingRfid) {
+                return redirect()->back()->with('error', "Kode RFID Tag ({$request->rfid_uid}) sudah terikat pada mahasiswa lain: {$existingRfid->nama_lengkap} (NIM: {$existingRfid->nim}).");
+            }
+
+            // Decode string Base64 gambar dari WebRTC Camera
+            $base64Image = $request->foto_wajah_base64;
+            $path = null;
+
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+                $data = substr($base64Image, strpos($base64Image, ',') + 1);
+                $data = base64_decode($data);
+                if ($data === false) {
+                    return redirect()->back()->with('error', 'Gagal memproses data gambar snapshot kamera. Silakan ambil foto snapshot ulang.');
+                }
+
+                $ext = strtolower($type[1]) === 'png' ? 'png' : 'jpg';
+                $slugNama = Str::slug($mahasiswa->nama_lengkap);
+                $filename = $mahasiswa->nim . '_' . ($slugNama ?: 'mahasiswa') . '_' . time() . '.' . $ext;
+                $path = 'profiles/' . $filename;
+
+                // Simpan berkas aktual ke disk public
+                Storage::disk('public')->put($path, $data);
+            } else {
+                return redirect()->back()->with('error', 'Format gambar Base64 tidak valid. Silakan ambil foto snapshot kamera ulang.');
+            }
+
+            // Hapus foto lama jika ada
+            if ($mahasiswa->foto_wajah && Storage::disk('public')->exists($mahasiswa->foto_wajah)) {
+                Storage::disk('public')->delete($mahasiswa->foto_wajah);
+            }
+
+            // UPDATE (Bukan Create) pada tabel mahasiswas
+            $mahasiswa->update([
+                'rfid_uid'              => trim($request->rfid_uid),
+                'foto_wajah'            => $path,
+                'last_photo_updated_at' => now(),
+            ]);
+
+            \App\Models\AuditLog::create([
+                'tipe_log'   => 'IOT_SENSOR_ASSIGNED',
+                'deskripsi'  => "Admin mendaftarkan sensor fisik RFID Tag ({$mahasiswa->rfid_uid}) dan dataset foto biometrik wajah untuk mahasiswa {$mahasiswa->nama_lengkap} (NIM: {$mahasiswa->nim})",
+                'ip_address' => $request->ip(),
+            ]);
+
+            return redirect()->route('admin.iot-device.index')
+                ->with('success', "✅ Registrasi sensor fisik RFID Tag ({$mahasiswa->rfid_uid}) dan foto biometrik wajah berhasil disimpan untuk {$mahasiswa->nama_lengkap} (NIM: {$mahasiswa->nim}).");
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed assigning IoT device sensors: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat memproses registrasi sensor IoT: ' . $e->getMessage());
+        }
+    }
+
     // --- LAPORAN KOMPEN MATRIKS 10 JAM ---
     public function laporanKompen()
     {
@@ -489,6 +633,13 @@ class AdminController extends Controller
                 if ($abs->status === 'A') {
                     $totalAlpaHours += $hours;
                     $compensationPenalty += $hours * 2;
+                } elseif ($abs->status === 'T') {
+                    // Jika mahasiswa datang di jam ke-2 atau lebih pada matakuliah multi-jam (terlambat), jam ke-1 yang dilewati terhitung Alpa
+                    if ($abs->jadwal && $abs->jam_pelajaran_ke > $abs->jadwal->jam_mulai) {
+                        $missedHours = $abs->jam_pelajaran_ke - $abs->jadwal->jam_mulai;
+                        $totalAlpaHours += $missedHours;
+                        $compensationPenalty += $missedHours * 2;
+                    }
                 } elseif ($abs->status === 'I') {
                     $totalIzinHours += $hours;
                     $compensationPenalty += $hours * 1;
@@ -556,20 +707,43 @@ class AdminController extends Controller
     {
         $kelas = Kelas::query()->get();
         $selectedKelasId = $request->get('kelas_id', $kelas->first()->id ?? null);
+        $selectedMatkulId = $request->get('mata_kuliah_id', null);
         
-        $dateStr = $request->get('tanggal', date('Y-m-d'));
+        $bulan = (int) $request->input('bulan', date('m'));
+        $tahun = (int) $request->input('tahun', date('Y'));
+
+        $monthsList = [
+            1  => 'Januari',   2  => 'Februari', 3  => 'Maret',    4  => 'April',
+            5  => 'Mei',       6  => 'Juni',     7  => 'Juli',     8  => 'Agustus',
+            9  => 'September', 10 => 'Oktober',  11 => 'November', 12 => 'Desember'
+        ];
+        $yearsList = range(date('Y') - 2, date('Y') + 1);
+
+        // Fetch MataKuliah list associated with selected class schedules
+        $mataKuliahList = MataKuliah::query();
+        if ($selectedKelasId) {
+            $mataKuliahList->whereHas('jadwals', function($q) use ($selectedKelasId) {
+                $q->where('kelas_id', $selectedKelasId);
+            });
+        }
+        $mataKuliahList = $mataKuliahList->get();
+        if ($mataKuliahList->isEmpty()) {
+            $mataKuliahList = MataKuliah::all();
+        }
+        
+        $dateStr = sprintf('%04d-%02d-01', $tahun, $bulan);
         $timestamp = strtotime($dateStr);
         
         $monday = date('Y-m-d', strtotime('monday this week', $timestamp));
         $saturday = date('Y-m-d', strtotime('saturday this week', $timestamp));
         
         $daysOfWeek = [
-            'Senin' => date('Y-m-d', strtotime($monday)),
-            'Selasa' => date('Y-m-d', strtotime('+1 day', strtotime($monday))),
-            'Rabu' => date('Y-m-d', strtotime('+2 days', strtotime($monday))),
-            'Kamis' => date('Y-m-d', strtotime('+3 days', strtotime($monday))),
-            'Jumat' => date('Y-m-d', strtotime('+4 days', strtotime($monday))),
-            'Sabtu' => date('Y-m-d', strtotime('+5 days', strtotime($monday))),
+            'Senin'   => date('Y-m-d', strtotime($monday)),
+            'Selasa'  => date('Y-m-d', strtotime('+1 day', strtotime($monday))),
+            'Rabu'    => date('Y-m-d', strtotime('+2 days', strtotime($monday))),
+            'Kamis'   => date('Y-m-d', strtotime('+3 days', strtotime($monday))),
+            'Jumat'   => date('Y-m-d', strtotime('+4 days', strtotime($monday))),
+            'Sabtu'   => date('Y-m-d', strtotime('+5 days', strtotime($monday))),
         ];
 
         $students = [];
@@ -587,10 +761,16 @@ class AdminController extends Controller
                 $studentIds = $students->pluck('id');
                 
                 // Fetch weekly records
-                $absensiRecords = Absensi::query()
+                $weeklyQuery = Absensi::query()
                     ->whereIn('mahasiswa_id', $studentIds)
-                    ->whereBetween('tanggal', [$monday, $saturday])
-                    ->get();
+                    ->whereBetween('tanggal', [$monday, $saturday]);
+
+                if ($selectedMatkulId) {
+                    $weeklyQuery->whereHas('jadwal', function($q) use ($selectedMatkulId) {
+                        $q->where('mata_kuliah_id', $selectedMatkulId);
+                    });
+                }
+                $absensiRecords = $weeklyQuery->get();
                     
                 foreach ($absensiRecords as $rec) {
                     $dateKey = $rec->tanggal->format('Y-m-d');
@@ -604,13 +784,18 @@ class AdminController extends Controller
                     }
                 }
                 
-                // Fetch monthly records
-                $startOfMonth = date('Y-m-01', $timestamp);
-                $endOfMonth = date('Y-m-t', $timestamp);
-                $monthlyRecords = Absensi::query()
+                // Fetch monthly records for selected month & year
+                $monthlyQuery = Absensi::query()
                     ->whereIn('mahasiswa_id', $studentIds)
-                    ->whereBetween('tanggal', [$startOfMonth, $endOfMonth])
-                    ->get();
+                    ->whereMonth('tanggal', $bulan)
+                    ->whereYear('tanggal', $tahun);
+
+                if ($selectedMatkulId) {
+                    $monthlyQuery->whereHas('jadwal', function($q) use ($selectedMatkulId) {
+                        $q->where('mata_kuliah_id', $selectedMatkulId);
+                    });
+                }
+                $monthlyRecords = $monthlyQuery->get();
                     
                 foreach ($monthlyRecords as $rec) {
                     if (!isset($monthlyTotals[$rec->mahasiswa_id])) {
@@ -626,9 +811,60 @@ class AdminController extends Controller
         $selectedKelas = $selectedKelasId ? Kelas::find($selectedKelasId) : null;
 
         return view('admin.laporan.rekap', compact(
-            'kelas', 'selectedKelasId', 'selectedKelas', 'dateStr', 'monday', 'saturday',
-            'daysOfWeek', 'students', 'weeklyAbsensi', 'weeklyTotals', 'monthlyTotals'
+            'kelas', 'selectedKelasId', 'selectedKelas', 'selectedMatkulId', 'mataKuliahList', 'dateStr', 'monday', 'saturday',
+            'daysOfWeek', 'students', 'weeklyAbsensi', 'weeklyTotals', 'monthlyTotals',
+            'bulan', 'tahun', 'monthsList', 'yearsList'
         ));
+    }
+
+    public function updateAbsensiStatus(Request $request)
+    {
+        $request->validate([
+            'mahasiswa_id' => 'required|exists:mahasiswas,id',
+            'jadwal_id'    => 'nullable|exists:jadwals,id',
+            'tanggal'      => 'required|date',
+            'status'       => 'required|in:H,T,I,S,A',
+            'keterangan'   => 'nullable|string|max:255',
+        ]);
+
+        $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
+        $jadwalId = $request->jadwal_id;
+
+        if (!$jadwalId) {
+            $jadwalId = Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first()?->id;
+        }
+
+        $absensi = Absensi::updateOrCreate(
+            [
+                'mahasiswa_id' => $mahasiswa->id,
+                'tanggal'      => $request->tanggal,
+                'jadwal_id'    => $jadwalId,
+            ],
+            [
+                'jam_pelajaran_ke'       => 1,
+                'status'                 => $request->status,
+                'waktu_tap_rfid'         => now(),
+                'waktu_verifikasi_wajah' => now(),
+            ]
+        );
+
+        $statusNames = [
+            'H' => 'Hadir Tepat Waktu',
+            'T' => 'Terlambat',
+            'I' => 'Izin',
+            'S' => 'Sakit',
+            'A' => 'Alpa',
+        ];
+
+        $statusText = $statusNames[$request->status] ?? $request->status;
+
+        AuditLog::create([
+            'tipe_log'   => 'ABSENSI_UPDATED',
+            'deskripsi'  => "Admin merubah status absensi {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) tanggal {$request->tanggal} menjadi '{$statusText}'" . ($request->keterangan ? " (Surat/Keterangan: {$request->keterangan})" : ''),
+            'ip_address' => $request->ip(),
+        ]);
+
+        return redirect()->back()->with('success', "Status absensi {$mahasiswa->nama_lengkap} berhasil diubah menjadi {$statusText}.");
     }
 
     // --- CETAK SURAT PERINGATAN II & III ---
@@ -729,8 +965,32 @@ class AdminController extends Controller
             return redirect()->back()->with('error', 'Cetak Surat Peringatan hanya diizinkan untuk mahasiswa yang memiliki akumulasi Alpa minimal 10 Jam.');
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.laporan.sp_letter_pdf', compact('mahasiswa', 'totalAlpaHours', 'compensationPenalty', 'spLevel', 'spTitle'))
-            ->setPaper('a4', 'portrait')
+        $spRoman = $spLevel == 1 ? 'I' : ($spLevel == 2 ? 'II' : 'III');
+        $nomorSurat = '414/PL9.8/EP/' . date('Y');
+        $tanggalSurat = \Carbon\Carbon::now()->locale('id')->isoFormat('DD MMMM Y');
+        $mingguKe = 16;
+        $tanggalAkhirHitung = \Carbon\Carbon::now()->locale('id')->isoFormat('DD MMMM Y');
+        $semesterTipe = 'Genap';
+        $tahunAkademik = '2025-2026';
+        $pejabatNama = 'Humaira, ST., MT';
+        $pejabatNip = '19810319 200604 2 002';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.laporan.sp_letter_pdf', compact(
+            'mahasiswa', 
+            'totalAlpaHours', 
+            'compensationPenalty',
+            'spLevel', 
+            'spTitle',
+            'spRoman',
+            'nomorSurat',
+            'tanggalSurat',
+            'mingguKe',
+            'tanggalAkhirHitung',
+            'semesterTipe',
+            'tahunAkademik',
+            'pejabatNama',
+            'pejabatNip'
+        ))->setPaper('a4', 'portrait')
             ->setOption([
                 'isRemoteEnabled' => true,
                 'isHtml5ParserEnabled' => true,
@@ -741,6 +1001,109 @@ class AdminController extends Controller
         $filename = "Surat_Peringatan_{$cleanName}_{$mahasiswa->nim}.pdf";
 
         return $pdf->stream($filename);
+    }
+
+    public function kirimSpEmail(Mahasiswa $mahasiswa)
+    {
+        $user = $mahasiswa->user;
+        $email = $mahasiswa->email ?? $user?->email;
+        $isVerified = $user && $user->email_verified_at !== null;
+
+        if (empty($email) || !$isVerified) {
+            return redirect()->back()->with('error', "SP diterbitkan di sistem, tetapi GAGAL TERKIRIM via email karena Mahasiswa ({$mahasiswa->nama_lengkap}) belum melengkapi & memverifikasi alamat emailnya.");
+        }
+
+        $mahasiswa->load(['kelas', 'absensis' => function ($query) {
+            $query->with('jadwal');
+        }]);
+
+        $totalAlpaHours = 0;
+        $compensationPenalty = 0;
+
+        foreach ($mahasiswa->absensis as $abs) {
+            $hours = 1;
+            if ($abs->jadwal) {
+                $hours = ($abs->jadwal->jam_selesai - $abs->jadwal->jam_mulai) + 1;
+            }
+
+            if ($abs->status === 'A') {
+                $totalAlpaHours += $hours;
+                $compensationPenalty += $hours * 2;
+            } elseif ($abs->status === 'I') {
+                $compensationPenalty += $hours * 1;
+            }
+        }
+
+        $spLevel = 0;
+        $spTitle = '';
+        if ($totalAlpaHours >= 10 && $totalAlpaHours < 30) {
+            $spLevel = 1;
+            $spTitle = 'Surat Peringatan 1';
+        } elseif ($totalAlpaHours >= 30 && $totalAlpaHours < 50) {
+            $spLevel = 2;
+            $spTitle = 'Surat Peringatan 2';
+        } elseif ($totalAlpaHours >= 50) {
+            $spLevel = 3;
+            $spTitle = 'Surat Peringatan 3';
+        }
+
+        if ($spLevel < 1) {
+            return redirect()->back()->with('error', "Mahasiswa ({$mahasiswa->nama_lengkap}) belum memenuhi ambang batas minimal Alpa (10 Jam) untuk penerbitan SP.");
+        }
+
+        $spRoman = $spLevel == 1 ? 'I' : ($spLevel == 2 ? 'II' : 'III');
+        $nomorSurat = '414/PL9.8/EP/' . date('Y');
+        $tanggalSurat = \Carbon\Carbon::now()->locale('id')->isoFormat('DD MMMM Y');
+        $mingguKe = 16;
+        $tanggalAkhirHitung = \Carbon\Carbon::now()->locale('id')->isoFormat('DD MMMM Y');
+        $semesterTipe = 'Genap';
+        $tahunAkademik = '2025-2026';
+        $pejabatNama = 'Humaira, ST., MT';
+        $pejabatNip = '19810319 200604 2 002';
+
+        // Generate PDF attachment in memory
+        $pdfContent = null;
+        try {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.laporan.sp_letter_pdf', compact(
+                'mahasiswa', 
+                'totalAlpaHours', 
+                'compensationPenalty',
+                'spLevel', 
+                'spTitle',
+                'spRoman',
+                'nomorSurat',
+                'tanggalSurat',
+                'mingguKe',
+                'tanggalAkhirHitung',
+                'semesterTipe',
+                'tahunAkademik',
+                'pejabatNama',
+                'pejabatNip'
+            ))->setPaper('a4', 'portrait')
+                ->setOption([
+                    'isRemoteEnabled' => true,
+                    'isHtml5ParserEnabled' => true,
+                    'chroot' => public_path(),
+                ]);
+            $pdfContent = $pdf->output();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed generating SP PDF: " . $e->getMessage());
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\SuratPeringatanMail($mahasiswa, $spLevel, $spTitle, $totalAlpaHours, $compensationPenalty, $pdfContent));
+
+            AuditLog::create([
+                'tipe_log'   => 'SP_SENT_EMAIL',
+                'deskripsi'  => "Admin mengirimkan dokumen {$spTitle} ke email terverifikasi {$email} ({$mahasiswa->nama_lengkap})",
+                'ip_address' => request()->ip(),
+            ]);
+
+            return redirect()->back()->with('success', "Surat Peringatan ({$spTitle}) berhasil dikirimkan via email terverifikasi ($email) beserta lampiran PDF! ✅");
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed sending SP Email: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal mengirimkan Surat Peringatan via Email. Periksa koneksi jaringan.');
+        }
     }
 
     // --- SETTINGS ---

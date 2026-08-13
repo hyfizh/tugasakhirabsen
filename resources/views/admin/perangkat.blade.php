@@ -5,7 +5,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Manajemen Perangkat IoT</h1>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola dan pantau status operasional mikrokontroler ESP32, Camera Node, dan RFID Scanner di seluruh lokasi lab & kelas.</p>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola dan pantau status operasional Raspberry Pi, Camera Node, dan RFID Scanner di seluruh lokasi lab &amp; kelas.</p>
             </div>
 
             <button class="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all">
@@ -52,7 +52,7 @@
                 </div>
                 <div>
                     <span class="text-2xl font-extrabold text-slate-900">4 Node AI</span>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">ESP32-CAM Face Recog</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">Raspberry Pi Face Recog</span>
                 </div>
             </div>
 
@@ -73,17 +73,17 @@
                 <table class="w-full text-left text-xs border-collapse">
                     <thead>
                         <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
-                            <th class="py-4 px-6">KODE & NAMA PERANGKAT</th>
+                            <th class="py-4 px-6">KODE &amp; NAMA PERANGKAT</th>
                             <th class="py-4 px-6">TIPE HARDWARE</th>
                             <th class="py-4 px-6">LOKASI PENEMPATAN</th>
-                            <th class="py-4 px-6">ALAMAT IP & MAC</th>
+                            <th class="py-4 px-6">ALAMAT IP &amp; MAC</th>
                             <th class="py-4 px-6 text-center">STATUS KONEKSI</th>
                             <th class="py-4 px-6 text-right">AKSI</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 font-medium">
                         
-                        <!-- Device 1: ESP32 RFID Gate 1 -->
+                        <!-- Device 1: Raspberry Pi RFID Gate 1 -->
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="py-4 px-6">
                                 <div class="flex items-center space-x-3">
@@ -91,8 +91,8 @@
                                         <i class="fa-solid fa-credit-card"></i>
                                     </div>
                                     <div>
-                                        <span class="font-extrabold text-slate-900 text-xs block leading-tight">ESP32-RFID-01</span>
-                                        <span class="text-[10px] text-slate-400 block mt-0.5">SN: ESP32-2026-RFID1</span>
+                                        <span class="font-extrabold text-slate-900 text-xs block leading-tight">RASPBERRY-RFID-01</span>
+                                        <span class="text-[10px] text-slate-400 block mt-0.5">SN: RPI-2026-RFID1</span>
                                     </div>
                                 </div>
                             </td>
@@ -113,7 +113,7 @@
                             </td>
                         </tr>
 
-                        <!-- Device 2: ESP32 Cam Lab AI -->
+                        <!-- Device 2: Raspberry Pi Cam Lab AI -->
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="py-4 px-6">
                                 <div class="flex items-center space-x-3">
@@ -121,12 +121,12 @@
                                         <i class="fa-solid fa-camera"></i>
                                     </div>
                                     <div>
-                                        <span class="font-extrabold text-slate-900 text-xs block leading-tight">ESP32-CAM-01</span>
-                                        <span class="text-[10px] text-slate-400 block mt-0.5">SN: CAM-2026-AI01</span>
+                                        <span class="font-extrabold text-slate-900 text-xs block leading-tight">RASPBERRY-CAM-01</span>
+                                        <span class="text-[10px] text-slate-400 block mt-0.5">SN: RPI-2026-AI01</span>
                                     </div>
                                 </div>
                             </td>
-                            <td class="py-4 px-6 font-bold text-slate-700">OV2640 Face Scanner</td>
+                            <td class="py-4 px-6 font-bold text-slate-700">Pi Camera Face Scanner</td>
                             <td class="py-4 px-6 text-slate-600">Lab Komputer 3A</td>
                             <td class="py-4 px-6 font-mono text-slate-600 text-xs">
                                 <span class="block">192.168.1.104</span>
@@ -143,7 +143,7 @@
                             </td>
                         </tr>
 
-                        <!-- Device 3: ESP32 RFID Lab 2B (Offline) -->
+                        <!-- Device 3: Raspberry Pi RFID Lab 2B (Offline) -->
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="py-4 px-6">
                                 <div class="flex items-center space-x-3">
@@ -151,8 +151,8 @@
                                         <i class="fa-solid fa-plug-circle-xmark"></i>
                                     </div>
                                     <div>
-                                        <span class="font-extrabold text-slate-900 text-xs block leading-tight">ESP32-RFID-02</span>
-                                        <span class="text-[10px] text-slate-400 block mt-0.5">SN: ESP32-2026-RFID2</span>
+                                        <span class="font-extrabold text-slate-900 text-xs block leading-tight">RASPBERRY-RFID-02</span>
+                                        <span class="text-[10px] text-slate-400 block mt-0.5">SN: RPI-2026-RFID2</span>
                                     </div>
                                 </div>
                             </td>

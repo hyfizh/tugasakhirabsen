@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('nama_lengkap');
             $table->string('rfid_uid')->nullable()->unique();
             $table->string('foto_wajah')->nullable();
-            $table->string('email')->unique();
+            $table->string('email')->nullable()->unique();
             $table->string('no_hp')->nullable();
             $table->foreignId('kelas_id')->constrained('kelas')->onDelete('restrict');
             $table->timestamps();

@@ -5,147 +5,16 @@
     <title>Surat Peringatan - {{ $mahasiswa->nama_lengkap }}</title>
     <style>
         @page {
+            size: A4 portrait;
             margin: 1.5cm 2cm 2cm 2.5cm;
         }
         body {
-            font-family: 'Times-Roman', 'Times New Roman', serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
-            line-height: 1.4;
+            line-height: 1.45;
             color: #000000;
             margin: 0;
             padding: 0;
-        }
-        
-        .kop-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 2px;
-        }
-        .kop-logo {
-            width: 75px;
-            vertical-align: middle;
-            text-align: center;
-        }
-        .kop-logo img {
-            width: 70px;
-            height: 70px;
-        }
-        .kop-text {
-            text-align: center;
-            vertical-align: middle;
-            padding: 0 5px;
-        }
-        .kop-instansi {
-            font-size: 11pt;
-            font-weight: bold;
-            margin: 0;
-            text-transform: uppercase;
-        }
-        .kop-kampus {
-            font-size: 13pt;
-            font-weight: bold;
-            margin: 1px 0;
-            text-transform: uppercase;
-        }
-        .kop-jurusan {
-            font-size: 14pt;
-            font-weight: bold;
-            margin: 1px 0;
-            text-transform: uppercase;
-        }
-        .kop-alamat {
-            font-size: 8.5pt;
-            margin: 2px 0 0 0;
-            line-height: 1.2;
-        }
-        .garis-kop {
-            border-top: 2.5px solid #000000;
-            border-bottom: 1px solid #000000;
-            height: 2px;
-            margin-top: 4px;
-            margin-bottom: 12px;
-        }
-
-        .meta-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
-            font-size: 10.5pt;
-        }
-        .meta-table td {
-            vertical-align: top;
-            padding: 1.5px 0;
-        }
-
-        .content-body {
-            font-size: 11pt;
-            text-align: justify;
-            line-height: 1.4;
-        }
-        .content-body p {
-            margin: 0 0 8px 0;
-            text-indent: 32px;
-        }
-
-        .table-identitas {
-            width: 90%;
-            margin: 8px auto 10px auto;
-            border-collapse: collapse;
-            font-size: 10.5pt;
-        }
-        .table-identitas td {
-            padding: 2.5px 4px;
-            vertical-align: top;
-        }
-
-        .table-peringatan {
-            width: 96%;
-            margin: 10px auto 12px auto;
-            border-collapse: collapse;
-            font-size: 10pt;
-            text-align: center;
-        }
-        .table-peringatan th {
-            background-color: #f1f5f9;
-            border: 1.5px solid #000000;
-            padding: 6px 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 9.5pt;
-        }
-        .table-peringatan td {
-            border: 1.5px solid #000000;
-            padding: 7px 8px;
-            font-weight: bold;
-        }
-
-        .table-ttd {
-            width: 100%;
-            margin-top: 16px;
-            border-collapse: collapse;
-            font-size: 10.5pt;
-        }
-        .col-left {
-            width: 30%;
-            text-align: center;
-            vertical-align: top;
-        }
-        .col-mid {
-            width: 30%;
-            text-align: center;
-            vertical-align: top;
-        }
-        .col-right {
-            width: 40%;
-            text-align: center;
-            vertical-align: top;
-        }
-        .ttd-ruang {
-            height: 46px;
-        }
-        .ttd-nama {
-            font-weight: bold;
-            text-decoration: underline;
         }
     </style>
 </head>
@@ -154,153 +23,118 @@
     @php
         $cleanNamaMahasiswa = preg_replace('/\s*\(SP\s*\d+\)/i', '', $mahasiswa->nama_lengkap);
 
-        // Prepare image paths for DomPDF
-        $logoLeftPath = null;
-        if (file_exists(public_path('images/logo.jpg'))) {
-            $logoLeftPath = public_path('images/logo.jpg');
-        } elseif (file_exists(public_path('images/logo.png'))) {
-            $logoLeftPath = public_path('images/logo.png');
-        } elseif (file_exists(public_path('images/logo_pnp.png'))) {
-            $logoLeftPath = public_path('images/logo_pnp.png');
+        $spRoman = $spRoman ?? ($spLevel == 1 ? 'I' : ($spLevel == 2 ? 'II' : 'III'));
+
+        $fullKelas = $mahasiswa->kelas->nama_kelas ?? '';
+        
+        if (preg_match('/^(.*?)\s*([0-9]+[A-Za-z]+)$/', $fullKelas, $matches)) {
+            $prodiRaw = trim($matches[1]);
+            $kelasRaw = trim($matches[2]);
+            $prodiDisplay = (str_contains(strtolower($prodiRaw), 'd-3') || str_contains(strtolower($prodiRaw), 'd3') || str_contains(strtolower($prodiRaw), 'd-4') || str_contains(strtolower($prodiRaw), 'd4')) 
+                            ? $prodiRaw 
+                            : 'D-3 ' . $prodiRaw;
+            $prodiKelasText = $prodiDisplay . ', Kelas ' . $kelasRaw;
+            $prodiOnlyText = $prodiDisplay;
+        } else {
+            $prodiKelasText = $fullKelas ? 'Prodi ' . $fullKelas : 'Teknologi Informasi';
+            $prodiOnlyText = $fullKelas ?: 'Teknologi Informasi';
         }
 
-        $logoRightPath = null;
-        if (file_exists(public_path('images/logo2.png'))) {
-            $logoRightPath = public_path('images/logo2.png');
-        } elseif (file_exists(public_path('images/logo2.jpg'))) {
-            $logoRightPath = public_path('images/logo2.jpg');
+        $logoPath = null;
+        if (file_exists(public_path('img/logo-pnp.png'))) {
+            $logoPath = public_path('img/logo-pnp.png');
+        } elseif (file_exists(public_path('images/logo.png'))) {
+            $logoPath = public_path('images/logo.png');
+        } elseif (file_exists(public_path('images/logo_pnp.png'))) {
+            $logoPath = public_path('images/logo_pnp.png');
+        } elseif (file_exists(public_path('images/logo.jpg'))) {
+            $logoPath = public_path('images/logo.jpg');
         }
     @endphp
 
-    <!-- KOP SURAT TABLE FOR DOMPDF -->
-    <table class="kop-table">
+    <!-- 1. KOP SURAT 2 KOLOM (15% LOGO, 85% HEADER TEKS) -->
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2px;">
         <tr>
-            <td class="kop-logo">
-                @if ($logoLeftPath)
-                    <img src="{{ $logoLeftPath }}" alt="Logo Kiri">
-                @else
-                    <div style="font-weight: bold; font-size: 14pt; color: #1e3a8a;">PNP</div>
+            <td style="width: 15%; text-align: center; vertical-align: middle;">
+                @if ($logoPath)
+                    <img src="{{ $logoPath }}" alt="Logo PNP" style="width: 75px; height: 75px; object-fit: contain;">
                 @endif
             </td>
-            <td class="kop-text">
-                <div class="kop-instansi">KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI</div>
-                <div class="kop-kampus">POLITEKNIK NEGERI PADANG</div>
-                <div class="kop-jurusan">JURUSAN TEKNOLOGI INFORMASI</div>
-                <div class="kop-alamat">
-                    Kampus Politeknik Negeri Padang, Limau Manis, Kec. Pauh, Kota Padang 25164<br>
-                    Telepon: (0751) 72590 | Fax: (0751) 72576 | Laman: https://ti.pnp.ac.id | Surel: info@pnp.ac.id
+            <td style="width: 85%; text-align: center; vertical-align: middle; padding-left: 5px;">
+                <div style="font-size: 10pt; font-weight: bold; margin: 0; text-transform: uppercase;">KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI</div>
+                <div style="font-size: 12pt; font-weight: bold; margin: 1px 0; text-transform: uppercase;">POLITEKNIK NEGERI PADANG</div>
+                <div style="font-size: 13pt; font-weight: bold; margin: 1px 0; text-transform: uppercase;">JURUSAN TEKNOLOGI INFORMASI</div>
+                <div style="font-size: 8.5pt; margin: 3px 0 0 0; line-height: 1.25;">
+                    Kampus Politeknik Negeri Padang, Limau Manis, Padang, Sumatera Barat<br>
+                    Telepon (0751) 72590, Faks. (0751) 72576<br>
+                    Laman: https://ti.pnp.ac.id | Surel: jurusan.ti@pnp.ac.id
                 </div>
             </td>
-            <td class="kop-logo">
-                @if ($logoRightPath)
-                    <img src="{{ $logoRightPath }}" alt="Logo Kanan">
-                @else
-                    <div style="font-weight: bold; font-size: 14pt; color: #0f172a;">TI</div>
-                @endif
+        </tr>
+    </table>
+
+    <div style="border-top: 2.5px solid #000000; border-bottom: 1px solid #000000; height: 2px; margin-top: 4px; margin-bottom: 16px;"></div>
+
+    <!-- 2. META SURAT (NOMOR, HAL, TANGGAL) -->
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11pt;">
+        <tr>
+            <td style="width: 60%; vertical-align: top;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 18%;">Nomor</td>
+                        <td style="width: 4%;">:</td>
+                        <td style="width: 78%;">{{ $nomorSurat ?? ($nomor_surat ?? '414/PL9.8/EP/' . date('Y')) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Hal</td>
+                        <td>:</td>
+                        <td>Peringatan {{ $spRoman }}</td>
+                    </tr>
+                </table>
+            </td>
+            <td style="width: 40%; vertical-align: top; text-align: right;">
+                {{ $tanggalSurat ?? ($tanggal_surat ?? \Carbon\Carbon::now()->locale('id')->isoFormat('DD MMMM Y')) }}
             </td>
         </tr>
     </table>
 
-    <div class="garis-kop"></div>
-
-    <!-- METADATA SURAT -->
-    <table class="meta-table">
-        <tr>
-            <td style="width: 12%;">Nomor</td>
-            <td style="width: 2%;">:</td>
-            <td style="width: 46%;">B/{{ rand(100, 299) }}/PL9.3.1/KM/{{ date('Y') }}</td>
-            <td style="width: 40%; text-align: right;">
-                Padang, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}
-            </td>
-        </tr>
-        <tr>
-            <td>Lampiran</td>
-            <td>:</td>
-            <td>- (Satu Lembar)</td>
-            <td></td>
-        </tr>
-        <tr>
-            <td>Hal</td>
-            <td>:</td>
-            <td><strong>{{ $spTitle }}</strong></td>
-            <td></td>
-        </tr>
-    </table>
-
-    <!-- ALAMAT TUJUAN SURAT -->
-    <div style="margin-bottom: 14px; font-size: 11pt; line-height: 1.35;">
-        Kepada Yth.<br>
-        Orang Tua / Wali dari Saudara/i:<br>
-        <strong>{{ $cleanNamaMahasiswa }}</strong><br>
-        di Tempat
+    <!-- 3. ALAMAT TUJUAN PENERIMA -->
+    <div style="margin-bottom: 16px; font-size: 11pt; line-height: 1.4;">
+        Yth. Sdr. <strong>{{ $cleanNamaMahasiswa }}</strong> BP {{ $mahasiswa->nim }}<br>
+        Mahasiswa {{ $prodiKelasText }}<br>
+        Politeknik Negeri Padang<br>
+        di<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Limau Manis
     </div>
 
-    <!-- ISI SURAT -->
-    <div class="content-body">
-        <p>
-            Dengan hormat, berdasarkan rekapitulasi kehadiran mahasiswa semester berjalan, Pimpinan Jurusan Teknologi Informasi memanggil dan menerbitkan Surat Peringatan kepada:
+    <!-- 4. ISI PARAGRAF NASKAH SURAT RESMI -->
+    <div style="font-size: 11pt; text-align: justify; line-height: 1.5;">
+        <p style="margin: 0 0 12px 0; text-indent: 32px;">
+            Sesuai dengan Peraturan Akademik Politeknik Negeri Padang nomor: 4597/PL.9/DL/2018 Pasal 26, tentang Ketidakhadiran, maka berdasarkan data kehadiran saudara yang ada di jurusan Teknologi Informasi, Prodi {{ $prodiOnlyText }} terhitung sampai minggu ke {{ $mingguKe ?? ($minggu_ke ?? 16) }} perkuliahan (sampai dengan tanggal {{ $tanggalAkhirHitung ?? ($tanggal_akhir_hitung ?? \Carbon\Carbon::now()->locale('id')->isoFormat('DD MMMM Y')) }}), absen Saudara pada semester {{ $semesterTipe ?? ($semester_tipe ?? 'Genap') }} tahun akademik {{ $tahunAkademik ?? ($tahun_akademik ?? '2025-2026') }} berjumlah {{ $totalAlpaHours }} Jam.
         </p>
 
-        <table class="table-identitas">
-            <tr>
-                <td style="width: 34%;">Nama Lengkap</td>
-                <td style="width: 4%; text-align: center;">:</td>
-                <td style="width: 62%; font-weight: bold;">{{ $cleanNamaMahasiswa }}</td>
-            </tr>
-            <tr>
-                <td>NIM / Kelas</td>
-                <td style="text-align: center;">:</td>
-                <td style="font-weight: bold;">{{ $mahasiswa->nim }} — {{ $mahasiswa->kelas->nama_kelas ?? '-' }} (Teknologi Informasi)</td>
-            </tr>
-            <tr>
-                <td>Kontak / No. HP</td>
-                <td style="text-align: center;">:</td>
-                <td style="font-weight: bold;">{{ $mahasiswa->no_hp ?? '-' }}</td>
-            </tr>
-        </table>
-
-        <p>
-            Mahasiswa bersangkutan tercatat memiliki ketidakhadiran tanpa keterangan (Alpa) yang melampaui batas toleransi akademis, dengan rincian sebagai berikut:
+        <p style="margin: 0 0 12px 0; text-indent: 32px;">
+            Sehubungan dengan hal tersebut diatas, maka Saudara diberikan Peringatan {{ $spRoman }}, apabila Saudara tidak memperhatikan kehadiran selanjutnya akan diteruskan pada peringatan berikutnya.
         </p>
 
-        <table class="table-peringatan">
-            <thead>
-                <tr>
-                    <th style="width: 30%;">Total Jam Alpa</th>
-                    <th style="width: 40%; background-color: #f1f5f9;">Kategori Peringatan</th>
-                    <th style="width: 30%;">Kewajiban Denda Kompensasi</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="font-size: 12.5pt; color: #b91c1c;">{{ $totalAlpaHours }} Jam Pelajaran</td>
-                    <td style="color: #b91c1c; font-weight: bold;">{{ $spTitle }}</td>
-                    <td style="font-size: 11.5pt;">{{ $compensationPenalty }} Jam Kerja Kompensasi</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <p>
-            Mohon perhatian Orang Tua / Wali. Mahasiswa diwajibkan menyelesaikan denda kompensasi sebelum Ujian Akhir Semester (UAS). Apabila Alpa mencapai <strong>50 Jam Pelajaran</strong>, mahasiswa bersangkutan dikenakan sanksi <strong>Drop Out (DO)</strong> sesuai Peraturan Akademik PNP.
-        </p>
-        <p>
-            Demikian Surat Peringatan ini disampaikan untuk diperhatikan.
+        <p style="margin: 0 0 12px 0; text-indent: 32px;">
+            Demikianlah hal ini disampaikan untuk dapat diperhatikan.
         </p>
     </div>
 
-    <!-- TANDA TANGAN OFFICIAL (KETUA JURUSAN) -->
-    <table class="table-ttd">
+    <!-- 5. BLOK TANDA TANGAN SEKRETARIS JURUSAN (CENTER-ALIGNED INSIDE RIGHT 45% BOX) -->
+    <table style="width: 45%; float: right; margin-top: 36px; border-collapse: collapse; font-size: 11pt;">
         <tr>
-            <td style="width: 55%;"></td>
-            <td style="width: 45%; text-align: center; vertical-align: top;">
-                Padang, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}<br>
-                <strong>Ketua Jurusan Teknologi Informasi</strong>
-                <div class="ttd-ruang"></div>
-                <div class="ttd-nama">Rika Idmayanti, S.T., M.Kom.</div>
-                <div style="font-size: 9.5pt;">NIP. 198007202005012002</div>
+            <td style="text-align: center; vertical-align: top;">
+                a.n. Ketua Jurusan,<br>
+                Sekretaris Jurusan
+                <div style="height: 60px;"></div>
+                <div style="font-weight: bold; text-decoration: underline;">{{ $pejabatNama ?? 'Humaira, ST., MT' }}</div>
+                <div style="font-size: 10pt; margin-top: 2px;">NIP. {{ $pejabatNip ?? '19810319 200604 2 002' }}</div>
             </td>
         </tr>
     </table>
+    <div style="clear: both;"></div>
 
 </body>
 </html>

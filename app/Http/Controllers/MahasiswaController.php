@@ -152,21 +152,42 @@ class MahasiswaController extends Controller
         }
 
         $request->validate([
-            'foto_wajah' => 'required|image|mimes:jpeg,png,jpg|max:2048', // max 2MB
+            'foto_wajah_base64' => 'nullable|string',
+            'foto_wajah'        => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        if ($request->file('foto_wajah')) {
+        $path = null;
+
+        // 1. Prioritaskan Decode Base64 dari Live Webcam HP / Laptop
+        if ($request->filled('foto_wajah_base64')) {
+            $base64Image = $request->foto_wajah_base64;
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+                $data = substr($base64Image, strpos($base64Image, ',') + 1);
+                $data = base64_decode($data);
+                $ext = strtolower($type[1]) === 'png' ? 'png' : 'jpg';
+
+                $filename = $mahasiswa->nim . '_' . time() . '.' . $ext;
+                $path = 'profiles/' . $filename;
+                Storage::disk('public')->put($path, $data);
+            }
+        } 
+        // 2. Fallback Upload File Jika Masih Menggunakan File Standard
+        elseif ($request->file('foto_wajah')) {
             $file = $request->file('foto_wajah');
             $filename = $mahasiswa->nim . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs('profiles', $filename, 'public');
-            
-            $mahasiswa->update([
-                'foto_wajah' => $path,
-                'last_photo_updated_at' => now(),
-            ]);
         }
 
-        return redirect()->route('mahasiswa.profile.form')->with('success', 'Foto wajah berhasil diunggah.');
+        if ($path) {
+            $mahasiswa->update([
+                'foto_wajah'            => $path,
+                'last_photo_updated_at' => now(),
+            ]);
+
+            return redirect()->route('mahasiswa.profile.form')->with('success', 'Foto wajah biometrik berhasil ditangkap & disimpan.');
+        }
+
+        return redirect()->route('mahasiswa.profile.form')->with('error', 'Gagal mengambil foto wajah. Silakan buka kamera dan ambil foto ulang.');
     }
 
     public function deleteFace()

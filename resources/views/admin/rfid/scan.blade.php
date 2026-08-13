@@ -8,9 +8,12 @@
             .then(data => {
                 if (data.rfid_uid) {
                     scannedUid = data.rfid_uid;
+                } else {
+                    scannedUid = '';
                 }
-            });
-        }, 2000);
+            })
+            .catch(err => console.error('RFID polling error:', err));
+        }, 500);
     ">
 
         <!-- Title & Subtitle -->
@@ -61,13 +64,13 @@
                     </div>
                     <div>
                         <h3 class="text-base font-extrabold text-slate-900">Menunggu Tapping Kartu...</h3>
-                        <p class="text-xs text-slate-500 font-medium mt-1 max-w-[220px] mx-auto">Dekatkan kartu RFID ke scanner ESP32 IoT untuk membaca UID.</p>
+                        <p class="text-xs text-slate-500 font-medium mt-1 max-w-[220px] mx-auto">Dekatkan kartu RFID ke scanner Raspberry Pi IoT untuk membaca UID.</p>
                     </div>
                 </div>
 
                 <!-- IoT Simulation Tap Box -->
                 <div class="mt-6 pt-5 border-t border-slate-100 text-left">
-                    <h4 class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2.5">Simulasi Hardware ESP32</h4>
+                    <h4 class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2.5">Simulasi Hardware Raspberry Pi</h4>
                     
                     <form action="{{ route('api.iot.log') }}" method="POST" target="_blank" class="space-y-2">
                         @csrf
