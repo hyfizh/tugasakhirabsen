@@ -438,7 +438,7 @@
                     <div class="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 flex items-start space-x-2.5">
                         <i class="fa-solid fa-circle-info text-indigo-500 text-sm mt-0.5"></i>
                         <div class="leading-relaxed">
-                            <strong>Pendaftaran Administrasi Dasar:</strong> Setelah data disimpan, registrasi fisik <strong>RFID Tag</strong> &amp; <strong>Foto Biometrik Wajah</strong> dilakukan terpisah via menu <a href="{{ route('admin.iot-device.index') }}" class="font-bold underline text-indigo-700 hover:text-indigo-900">Stasiun Registrasi Sensor IoT</a>.
+                            <strong>Pendaftaran Administrasi Dasar:</strong> Masukkan data NIM, Nama Lengkap, dan Kelas Mahasiswa.
                         </div>
                     </div>
 
@@ -471,7 +471,7 @@
                     </button>
                 </div>
 
-                <form :action="'/admin/mahasiswa/' + editId" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+                <form :action="'/admin/mahasiswa/' + editId" method="POST" class="p-6 space-y-4">
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="id" :value="editId">
@@ -492,70 +492,25 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label for="edit_kelas_id" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Kelas</label>
-                            <select name="kelas_id" id="edit_kelas_id" required :value="editKelasId" @change="editKelasId = $event.target.value"
-                                    class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
-                                @foreach ($kelas as $k)
-                                    <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="edit_rfid_uid" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">RFID UID Tag</label>
-                            <div class="flex space-x-2">
-                                <input type="text" name="rfid_uid" id="edit_rfid_uid" :value="editRfid" @input="editRfid = $event.target.value" placeholder="Contoh: CF45B1E6DD"
-                                       class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs font-mono text-slate-800 p-3">
-                                <button type="button" @click="fetchRfidForEdit()" class="mt-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-bold rounded-xl border border-indigo-200 whitespace-nowrap" title="Scan RFID dari Scanner IoT">
-                                    <i class="fa-solid fa-barcode"></i> Scan
-                                </button>
-                            </div>
-                        </div>
+                    <div>
+                        <label for="edit_kelas_id" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Kelas Terdaftar</label>
+                        <select name="kelas_id" id="edit_kelas_id" required :value="editKelasId" @change="editKelasId = $event.target.value"
+                                class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
+                            @foreach ($kelas as $k)
+                                <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <!-- WebRTC Camera Capture Section for Admin Edit Mahasiswa -->
-                    <div class="space-y-2 pt-2 border-t border-slate-100">
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                            <i class="fa-solid fa-camera text-indigo-500 mr-1"></i> Perbarui Foto Biometrik Wajah
-                        </label>
-                        
-                        <div class="bg-slate-900 rounded-xl p-3 text-center space-y-2 relative overflow-hidden">
-                            <video id="admin-edit-webcam" autoplay playsinline class="hidden w-full max-h-40 rounded-lg object-cover mx-auto -scale-x-100 border border-slate-700"></video>
-                            <canvas id="admin-edit-canvas" class="hidden"></canvas>
-                            <img id="admin-edit-preview" class="hidden w-full max-h-40 rounded-lg object-cover mx-auto border border-slate-700 shadow-md">
-                            
-                            <div id="admin-edit-placeholder" class="py-4 text-slate-400 space-y-1">
-                                <i class="fa-solid fa-camera-retro text-2xl"></i>
-                                <p class="text-[11px] font-semibold">Webcam Live Selfie Belum Aktif</p>
-                            </div>
-
-                            <div class="flex items-center justify-center space-x-2">
-                                <button type="button" onclick="startAdminEditWebcam()" id="btn-admin-edit-start" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow transition-all inline-flex items-center">
-                                    <i class="fa-solid fa-video mr-1.5"></i> Buka Kamera Live
-                                </button>
-                                <button type="button" onclick="captureAdminEditSnapshot()" id="btn-admin-edit-capture" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow transition-all inline-flex items-center">
-                                    <i class="fa-solid fa-circle-dot mr-1.5"></i> Ambil Foto Snapshot
-                                </button>
-                                <button type="button" onclick="retakeAdminEditSnapshot()" id="btn-admin-edit-retake" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow transition-all inline-flex items-center">
-                                    <i class="fa-solid fa-rotate-left mr-1.5"></i> Foto Ulang
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Hidden Base64 Input -->
-                        <input type="hidden" name="foto_wajah_base64" id="admin_edit_foto_wajah_base64">
-
-                        <!-- File Input Fallback -->
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-start space-x-2">
+                        <i class="fa-solid fa-circle-info text-indigo-500 text-sm mt-0.5"></i>
                         <div>
-                            <label for="edit_foto_wajah" class="block text-[11px] font-medium text-slate-500 mb-1">Atau Unggah File Foto Baru (JPG/PNG):</label>
-                            <input type="file" name="foto_wajah" id="edit_foto_wajah" accept="image/*" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer">
+                            <strong>Pembaruan Data:</strong> Perubahan data NIM, Nama, dan Kelas akan memperbarui profil mahasiswa secara langsung.
                         </div>
                     </div>
 
                     <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-                        <button type="button" @click="openEditModal = false; stopAdminEditWebcam();" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
+                        <button type="button" @click="openEditModal = false" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
                             Batal
                         </button>
                         <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md hover:shadow-lg transition-all">

@@ -111,7 +111,7 @@
                     <span class="ml-3.5 text-xs font-semibold" x-show="sidebarOpen">Mahasiswa</span>
                 </a>
 
-                <!-- 2a. Stasiun Registrasi Sensor IoT (WebRTC & RFID) -->
+                <!-- 2a. Stasiun Sensor IoT (WebRTC & RFID 2-Tab Dashboard) -->
                 <a href="{{ route('admin.iot-device.index') }}" 
                    class="flex items-center px-4 py-2.5 rounded-xl transition-all group {{ request()->routeIs('admin.iot-device.*') ? 'active-nav-pill shadow-sm' : 'text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 font-medium' }}">
                     <i class="fa-solid fa-microchip w-5 text-center text-base {{ request()->routeIs('admin.iot-device.*') ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-700' }}"></i>
@@ -188,13 +188,6 @@
                         </a>
                     </div>
                 </div>
-
-                <!-- 8. IoT Devices (RFID Scan) -->
-                <a href="{{ route('admin.rfid.scan') }}" 
-                   class="flex items-center px-4 py-2.5 rounded-xl transition-all group {{ request()->routeIs('admin.rfid.*') ? 'active-nav-pill shadow-sm' : 'text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 font-medium' }}">
-                    <i class="fa-solid fa-tower-broadcast w-5 text-center text-base {{ request()->routeIs('admin.rfid.*') ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-700' }}"></i>
-                    <span class="ml-3.5 text-xs font-semibold" x-show="sidebarOpen">IoT Devices</span>
-                </a>
 
                 <!-- 9. Perangkat Hardware IoT -->
                 <a href="{{ route('admin.perangkat.index') }}" 

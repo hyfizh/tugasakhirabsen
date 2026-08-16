@@ -607,6 +607,121 @@ class AdminController extends Controller
         }
     }
 
+    public function assignRfidDevice(Request $request)
+    {
+        $request->validate([
+            'mahasiswa_id' => 'required|exists:mahasiswas,id',
+            'rfid_uid'     => 'required|string|max:50',
+        ]);
+
+        try {
+            $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
+
+            // Cek keunikan RFID Tag
+            $existingRfid = Mahasiswa::where('rfid_uid', trim($request->rfid_uid))
+                ->where('id', '!=', $mahasiswa->id)
+                ->first();
+
+            if ($existingRfid) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => "Kode RFID Tag ({$request->rfid_uid}) sudah terikat pada mahasiswa lain: {$existingRfid->nama_lengkap} (NIM: {$existingRfid->nim})."], 422);
+                }
+                return redirect()->back()->with('error', "Kode RFID Tag ({$request->rfid_uid}) sudah terikat pada mahasiswa lain: {$existingRfid->nama_lengkap} (NIM: {$existingRfid->nim}).");
+            }
+
+            $mahasiswa->update([
+                'rfid_uid' => trim($request->rfid_uid),
+            ]);
+
+            \App\Models\AuditLog::create([
+                'tipe_log'   => 'IOT_RFID_BINDING',
+                'deskripsi'  => "Admin mendaftarkan kartu RFID Tag ({$mahasiswa->rfid_uid}) untuk mahasiswa {$mahasiswa->nama_lengkap} (NIM: {$mahasiswa->nim})",
+                'ip_address' => $request->ip(),
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => "✅ Pendaftaran kartu RFID ({$mahasiswa->rfid_uid}) berhasil untuk {$mahasiswa->nama_lengkap}."]);
+            }
+
+            return redirect()->route('admin.iot-device.index')
+                ->with('success', "✅ Pendaftaran kartu RFID ({$mahasiswa->rfid_uid}) berhasil disimpan untuk {$mahasiswa->nama_lengkap} (NIM: {$mahasiswa->nim}).");
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed assigning RFID device: " . $e->getMessage());
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Terjadi kesalahan sistem saat memproses registrasi RFID: ' . $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat memproses registrasi RFID: ' . $e->getMessage());
+        }
+    }
+
+    public function assignFaceDevice(Request $request)
+    {
+        $request->validate([
+            'mahasiswa_id'      => 'required|exists:mahasiswas,id',
+            'foto_wajah_base64' => 'required|string',
+        ]);
+
+        try {
+            $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
+
+            $base64Image = $request->foto_wajah_base64;
+            $path = null;
+
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+                $data = substr($base64Image, strpos($base64Image, ',') + 1);
+                $data = base64_decode($data);
+                if ($data === false) {
+                    if ($request->wantsJson()) {
+                        return response()->json(['success' => false, 'message' => 'Gagal memproses data gambar snapshot kamera. Silakan ambil foto snapshot ulang.'], 422);
+                    }
+                    return redirect()->back()->with('error', 'Gagal memproses data gambar snapshot kamera. Silakan ambil foto snapshot ulang.');
+                }
+
+                $ext = strtolower($type[1]) === 'png' ? 'png' : 'jpg';
+                $slugNama = Str::slug($mahasiswa->nama_lengkap);
+                $filename = $mahasiswa->nim . '_' . ($slugNama ?: 'mahasiswa') . '_' . time() . '.' . $ext;
+                $path = 'profiles/' . $filename;
+
+                Storage::disk('public')->put($path, $data);
+            } else {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Format gambar Base64 tidak valid.'], 422);
+                }
+                return redirect()->back()->with('error', 'Format gambar Base64 tidak valid.');
+            }
+
+            if ($mahasiswa->foto_wajah && Storage::disk('public')->exists($mahasiswa->foto_wajah)) {
+                Storage::disk('public')->delete($mahasiswa->foto_wajah);
+            }
+
+            $mahasiswa->update([
+                'foto_wajah'            => $path,
+                'last_photo_updated_at' => now(),
+            ]);
+
+            \App\Models\AuditLog::create([
+                'tipe_log'   => 'IOT_FACE_ENROLLED',
+                'deskripsi'  => "Admin merekam foto dataset biometrik wajah untuk mahasiswa {$mahasiswa->nama_lengkap} (NIM: {$mahasiswa->nim})",
+                'ip_address' => $request->ip(),
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => "✅ Pendaftaran foto biometrik wajah berhasil untuk {$mahasiswa->nama_lengkap}.", 'foto_url' => asset('storage/' . $path)]);
+            }
+
+            return redirect()->route('admin.iot-device.index')
+                ->with('success', "✅ Registrasi foto biometrik wajah berhasil disimpan untuk {$mahasiswa->nama_lengkap} (NIM: {$mahasiswa->nim}).");
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed assigning Face device: " . $e->getMessage());
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Terjadi kesalahan sistem saat menyimpan foto biometrik: ' . $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat menyimpan foto biometrik: ' . $e->getMessage());
+        }
+    }
+
     // --- LAPORAN KOMPEN MATRIKS 10 JAM ---
     public function laporanKompen()
     {

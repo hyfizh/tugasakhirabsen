@@ -65,9 +65,11 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/rfid/assign', [AdminController::class, 'assignRfid'])->name('rfid.assign');
     Route::get('/rfid/clear', [AdminController::class, 'clearScannedRfid'])->name('rfid.clear');
 
-    // Stasiun Registrasi Sensor IoT (RFID Tag & Biometrik Wajah WebRTC)
+    // Stasiun Registrasi Sensor IoT (Dashboard 2-Tab: RFID Binding & Face Enrollment)
     Route::get('/iot-device', [AdminController::class, 'indexIotDevice'])->name('iot-device.index');
     Route::post('/iot-device/assign', [AdminController::class, 'assignIotDevice'])->name('iot-device.assign');
+    Route::post('/iot-device/assign-rfid', [AdminController::class, 'assignRfidDevice'])->name('iot-device.assign-rfid');
+    Route::post('/iot-device/assign-face', [AdminController::class, 'assignFaceDevice'])->name('iot-device.assign-face');
 
     // Laporan Kompen
     Route::get('/laporan/kompen', [AdminController::class, 'laporanKompen'])->name('laporan.kompen');
