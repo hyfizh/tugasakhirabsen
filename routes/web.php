@@ -74,8 +74,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Laporan Kompen
     Route::get('/laporan/kompen', [AdminController::class, 'laporanKompen'])->name('laporan.kompen');
 
-    // Laporan Rekap Absen untuk Dicetak & Ubah Status Absensi (Sakit/Izin/Hadir/Alpa)
+    // Laporan Rekap Absen (Lihat, Download PDF & Ubah Status Absensi)
     Route::get('/laporan/rekap', [AdminController::class, 'rekapAbsen'])->name('laporan.rekap');
+    Route::get('/laporan/rekap/download-pdf', [AdminController::class, 'downloadRekapPdf'])->name('laporan.rekap.download-pdf');
     Route::post('/absensi/update-status', [AdminController::class, 'updateAbsensiStatus'])->name('absensi.update-status');
 
     // Cetak, Download & Kirim Email Surat Peringatan (SP 1, 2, 3)
@@ -86,8 +87,12 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Audit Logs
     Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
 
-    // Perangkat IoT
+    // Perangkat IoT CRUD & Ping Test
     Route::get('/perangkat', [AdminController::class, 'indexPerangkat'])->name('perangkat.index');
+    Route::post('/perangkat', [AdminController::class, 'storePerangkat'])->name('perangkat.store');
+    Route::put('/perangkat/{perangkat}', [AdminController::class, 'updatePerangkat'])->name('perangkat.update');
+    Route::delete('/perangkat/{perangkat}', [AdminController::class, 'destroyPerangkat'])->name('perangkat.destroy');
+    Route::get('/perangkat/{id}/ping', [AdminController::class, 'pingPerangkat'])->name('perangkat.ping');
 
     // Settings
     Route::get('/settings', [AdminController::class, 'settings'])->name('settings');

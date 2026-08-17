@@ -242,12 +242,12 @@ class MqttSubscribe extends Command
         $lateStart  = date('H:i', strtotime($endTime . ' - 15 minutes'));
         $lateEnd    = date('H:i', strtotime($endTime . ' + 15 minutes'));
 
-        // Jika tap berada di Window 15 Menit Awal ATAU Window 15 Menit Akhir
+        // Jika tap berada di Window 15 Menit Awal (07:15 - 07:45 untuk jam 07:30) ATAU Window 15 Menit Akhir
         if (($time >= $earlyStart && $time <= $earlyEnd) || ($time >= $lateStart && $time <= $lateEnd)) {
             return 'H'; // Hadir Tepat Waktu / Presensi Valid Sesi
         }
 
-        // Jika tap di tengah-tengah rentang waktu perkuliahan (> 15 menit awal & < 15 menit akhir)
-        return 'T'; // Terlambat
+        // Jika lewat dari 15 menit awal (misal lewat dari 07:45), langsung dicatat Alpa ('A')
+        return 'A'; // Alpa langsung
     }
 }

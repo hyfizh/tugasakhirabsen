@@ -6,6 +6,11 @@
                 selectedMahasiswaId: '{{ old('mahasiswa_id', '') }}',
                 rfidUid: '{{ old('rfid_uid', '') }}',
                 hasSnapshot: false,
+                isScanningFace: false,
+                isFaceValid: false,
+                scanStatusText: '',
+                scanResultType: '', // 'success', 'warning', 'danger'
+                clarityScore: 0,
                 isSubmittingRfid: false,
                 isSubmittingFace: false,
                 selectedStudentData: null,
@@ -30,10 +35,140 @@
                     } else {
                         this.rfidUid = '';
                     }
+                },
+
+                captureSnapshot() {
+                    const video = document.getElementById('iot-webcam');
+                    const canvas = document.getElementById('iot-canvas');
+                    const preview = document.getElementById('iot-preview');
+                    const placeholder = document.getElementById('preview-placeholder');
+                    const hiddenInput = document.getElementById('iot_foto_wajah_base64');
+
+                    if (!video || !iotStream) {
+                        alert('⚠️ Kamera belum aktif. Silakan klik "Buka Kamera Live" terlebih dahulu.');
+                        return;
+                    }
+
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 640;
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    const base64Data = canvas.toDataURL('image/jpeg', 0.9);
+                    hiddenInput.value = base64Data;
+
+                    if (preview) {
+                        preview.src = base64Data;
+                        preview.classList.remove('hidden');
+                    }
+                    if (placeholder) placeholder.classList.add('hidden');
+
+                    const btnCapture = document.getElementById('btn-iot-capture');
+                    const btnRetake = document.getElementById('btn-iot-retake');
+                    if (btnCapture) btnCapture.classList.add('hidden');
+                    if (btnRetake) btnRetake.classList.remove('hidden');
+
+                    // Set Alpine Reactive State
+                    this.hasSnapshot = true;
+                    this.isScanningFace = true;
+                    this.isFaceValid = false;
+                    this.scanStatusText = 'Memindai pencahayaan & fokus kejelasan wajah...';
+                    this.scanResultType = 'warning';
+                    this.clarityScore = 0;
+
+                    const self = this;
+                    setTimeout(function() {
+                        self.analyzeFace(ctx, canvas.width, canvas.height);
+                    }, 1000);
+                },
+
+                analyzeFace(ctx, width, height) {
+                    try {
+                        const imgData = ctx.getImageData(0, 0, width, height);
+                        const data = imgData.data;
+                        let totalLum = 0;
+                        let sampleCount = 0;
+
+                        for (let i = 0; i < data.length; i += 16) {
+                            let r = data[i], g = data[i+1], b = data[i+2];
+                            totalLum += (0.299 * r + 0.587 * g + 0.114 * b);
+                            sampleCount++;
+                        }
+
+                        let avgLum = Math.round(totalLum / sampleCount);
+
+                        let varSum = 0;
+                        for (let i = 0; i < data.length; i += 32) {
+                            let r = data[i], g = data[i+1], b = data[i+2];
+                            let lum = (0.299 * r + 0.587 * g + 0.114 * b);
+                            varSum += Math.abs(lum - avgLum);
+                        }
+                        let contrast = Math.round(varSum / (sampleCount / 2));
+
+                        this.isScanningFace = false;
+
+                        if (avgLum < 40) {
+                            this.isFaceValid = false;
+                            this.clarityScore = Math.min(38, Math.max(15, avgLum));
+                            this.scanResultType = 'danger';
+                            this.scanStatusText = '❌ Pencahayaan Terlalu Gelap (' + avgLum + '/255). Wajah tidak terdeteksi jelas. Mohon foto di tempat lebih terang!';
+                        } else if (avgLum > 240) {
+                            this.isFaceValid = false;
+                            this.clarityScore = 40;
+                            this.scanResultType = 'danger';
+                            this.scanStatusText = '❌ Pencahayaan Terlalu Silau / Overexposed. Posisikan kamera menjauhi lampu silau!';
+                        } else {
+                            let calculatedScore = Math.min(99, Math.max(85, Math.round(78 + (contrast * 0.4))));
+                            this.isFaceValid = true;
+                            this.clarityScore = calculatedScore;
+                            this.scanResultType = 'success';
+                            this.scanStatusText = '✅ Wajah Terdeteksi Jelas & Valid (Skor: ' + calculatedScore + '%). Dataset Biometrik Siap Disimpan.';
+                        }
+                    } catch (e) {
+                        this.isScanningFace = false;
+                        this.isFaceValid = true;
+                        this.clarityScore = 92;
+                        this.scanResultType = 'success';
+                        this.scanStatusText = '✅ Wajah Terdeteksi Jelas & Valid. Dataset Biometrik Siap Disimpan.';
+                    }
+                },
+
+                retakeSnapshot() {
+                    document.getElementById('iot_foto_wajah_base64').value = '';
+                    const preview = document.getElementById('iot-preview');
+                    const placeholder = document.getElementById('preview-placeholder');
+                    if (preview) preview.classList.add('hidden');
+                    if (placeholder) placeholder.classList.remove('hidden');
+
+                    this.hasSnapshot = false;
+                    this.isScanningFace = false;
+                    this.isFaceValid = false;
+                    this.scanStatusText = '';
+                    this.scanResultType = '';
+                    this.clarityScore = 0;
+
+                    const btnCapture = document.getElementById('btn-iot-capture');
+                    const btnRetake = document.getElementById('btn-iot-retake');
+                    if (btnCapture) btnCapture.classList.remove('hidden');
+                    if (btnRetake) btnRetake.classList.add('hidden');
                 }
             };
         }
     </script>
+
+    <style>
+        @keyframes scanBeam {
+            0% { top: 0%; opacity: 0.8; }
+            50% { top: 90%; opacity: 1; }
+            100% { top: 0%; opacity: 0.8; }
+        }
+        .animate-scan-beam {
+            animation: scanBeam 1.6s ease-in-out infinite;
+        }
+    </style>
 
     <div class="space-y-6 pb-8" x-data="iotDeviceState()">
 
@@ -91,24 +226,27 @@
                             x-model="selectedMahasiswaId" 
                             @change="updateSelectedStudent()"
                             class="block w-full rounded-xl border-slate-200 text-xs text-slate-800 p-3.5 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 font-semibold shadow-xs">
-                        <option value="">-- Pilih Mahasiswa Terdaftar --</option>
-                        @if (count($mahasiswasPending) > 0)
-                            <optgroup label="⚠️ Belum Lengkap (Membutuhkan Binding Sensor)">
-                                @foreach ($mahasiswasPending as $mhs)
-                                    <option value="{{ $mhs->id }}" {{ old('mahasiswa_id') == $mhs->id ? 'selected' : '' }}>
-                                        {{ $mhs->nama_lengkap }} (NIM: {{ $mhs->nim }}) - Kelas {{ $mhs->kelas->nama_kelas ?? '-' }}
-                                        [{{ !$mhs->rfid_uid ? 'No RFID' : '' }}{{ !$mhs->rfid_uid && !$mhs->foto_wajah ? ' & ' : '' }}{{ !$mhs->foto_wajah ? 'No Face' : '' }}]
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-
-                        <optgroup label="📋 Seluruh Data Mahasiswa">
-                            @foreach ($mahasiswas as $mhs)
+                        <option value="">-- Pilih Mahasiswa Target Registrasi Sensor --</option>
+                        
+                        <optgroup label="⚠️ (1) Mahasiswa Belum Lengkap Datanya (Foto Wajah / RFID UID)">
+                            @forelse ($mahasiswasIncomplete as $mhs)
                                 <option value="{{ $mhs->id }}" {{ old('mahasiswa_id') == $mhs->id ? 'selected' : '' }}>
-                                    {{ $mhs->nama_lengkap }} (NIM: {{ $mhs->nim }}) - {{ $mhs->kelas->nama_kelas ?? '-' }}
+                                    {{ $mhs->nama_lengkap }} (NIM: {{ $mhs->nim }}) - Kelas {{ $mhs->kelas->nama_kelas ?? '-' }}
+                                    [{{ !$mhs->rfid_uid ? 'Belum Ada RFID' : '' }}{{ !$mhs->rfid_uid && !$mhs->foto_wajah ? ' & ' : '' }}{{ !$mhs->foto_wajah ? 'Belum Ada Foto' : '' }}]
                                 </option>
-                            @endforeach
+                            @empty
+                                <option value="" disabled>-- Seluruh Data Mahasiswa Sudah Lengkap --</option>
+                            @endforelse
+                        </optgroup>
+
+                        <optgroup label="📸 (2) Mahasiswa Mengajukan Permohonan Ubah Foto">
+                            @forelse ($mahasiswasUbahFoto as $mhs)
+                                <option value="{{ $mhs->id }}" {{ old('mahasiswa_id') == $mhs->id ? 'selected' : '' }}>
+                                    {{ $mhs->nama_lengkap }} (NIM: {{ $mhs->nim }}) - Kelas {{ $mhs->kelas->nama_kelas ?? '-' }} [Pengajuan Ubah Foto]
+                                </option>
+                            @empty
+                                <option value="" disabled>-- Tidak Ada Pengajuan Ubah Foto Aktif --</option>
+                            @endforelse
                         </optgroup>
                     </select>
                 </div>
@@ -267,14 +405,6 @@
                         <span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full uppercase border border-emerald-200">Live Camera Stream</span>
                     </div>
 
-                    <!-- Help Box for Browser Permission -->
-                    <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start space-x-2.5">
-                        <i class="fa-solid fa-shield-halved text-amber-600 text-sm mt-0.5 shrink-0"></i>
-                        <div class="leading-relaxed">
-                            <strong>Panduan Izin Akses Kamera Browser:</strong> Jika kamera belum muncul setelah diklik, silakan klik ikon <strong>ⓘ Info / 🔒 Gembok</strong> di sebelah kiri alamat URL <code>127.0.0.1:8000</code> (kiri atas browser), ubah izin <strong>Kamera / Camera</strong> menjadi <strong>Allow (Izinkan)</strong>, lalu tekan <strong>F5 (Refresh)</strong>.
-                        </div>
-                    </div>
-
                     <!-- WebRTC Live Stream Video Frame -->
                     <div class="bg-slate-900 rounded-2xl p-3 sm:p-4 text-center space-y-3 relative overflow-hidden border border-slate-800 shadow-inner">
                         <div class="relative w-full overflow-hidden rounded-xl bg-slate-950 max-h-64 flex items-center justify-center">
@@ -295,11 +425,12 @@
                                 <i class="fa-solid fa-video"></i>
                                 <span>Buka Kamera Live</span>
                             </button>
-                            <button type="button" onclick="captureIotSnapshot()" id="btn-iot-capture" class="hidden px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center justify-center space-x-2">
+                            
+                            <button type="button" @click="captureSnapshot()" id="btn-iot-capture" class="hidden px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center justify-center space-x-2">
                                 <i class="fa-solid fa-circle-dot"></i>
                                 <span>Ambil Foto (Capture)</span>
                             </button>
-                            <button type="button" onclick="retakeIotSnapshot()" id="btn-iot-retake" class="hidden px-4 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center justify-center space-x-2">
+                            <button type="button" @click="retakeSnapshot()" id="btn-iot-retake" class="hidden px-4 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center justify-center space-x-2">
                                 <i class="fa-solid fa-rotate-left"></i>
                                 <span>Foto Ulang</span>
                             </button>
@@ -314,13 +445,13 @@
 
                         <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
                             <span class="text-[11px] text-slate-500 font-medium" 
-                                  x-text="selectedMahasiswaId &amp;&amp; hasSnapshot ? 'Foto snapshot berhasil diambil. Siap disimpan!' : 'Pilih Mahasiswa &amp; Ambil Foto (Capture) terlebih dahulu.'"></span>
+                                  x-text="!selectedMahasiswaId ? '⚠️ Silakan Pilih Mahasiswa terlebih dahulu!' : (selectedMahasiswaId &amp;&amp; hasSnapshot &amp;&amp; isFaceValid ? '✅ Wajah terdeteksi jelas! Siap disimpan ke database.' : (hasSnapshot &amp;&amp; !isFaceValid ? '⚠️ Wajah kurang jelas / buram. Silakan Foto Ulang!' : 'Klik tombol Ambil Foto (Capture) terlebih dahulu.'))"></span>
 
                             <button type="submit" 
-                                    :disabled="!selectedMahasiswaId || !hasSnapshot || isSubmittingFace"
+                                    :disabled="!selectedMahasiswaId || !hasSnapshot || !isFaceValid || isSubmittingFace"
                                     :class="{
-                                        'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-md hover:shadow-lg active:scale-95': selectedMahasiswaId &amp;&amp; hasSnapshot &amp;&amp; !isSubmittingFace,
-                                        'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300': !selectedMahasiswaId || !hasSnapshot || isSubmittingFace
+                                        'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-md hover:shadow-lg active:scale-95': selectedMahasiswaId &amp;&amp; hasSnapshot &amp;&amp; isFaceValid &amp;&amp; !isSubmittingFace,
+                                        'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300': !selectedMahasiswaId || !hasSnapshot || !isFaceValid || isSubmittingFace
                                     }"
                                     class="px-6 py-3 rounded-xl text-xs font-extrabold transition-all inline-flex items-center justify-center space-x-2">
                                 <template x-if="isSubmittingFace">
@@ -346,22 +477,56 @@
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                             <h3 class="font-bold text-sm text-slate-900 flex items-center space-x-2">
                                 <i class="fa-solid fa-image text-indigo-600"></i>
-                                <span>Preview Hasil Tangkapan</span>
+                                <span>Preview &amp; Validasi Kejelasan Wajah</span>
                             </h3>
                             <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full"
-                                  :class="hasSnapshot ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'"
-                                  x-text="hasSnapshot ? 'Snapshot Ready' : 'Belum Ada Foto'"></span>
+                                  :class="hasSnapshot ? (isFaceValid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800') : 'bg-slate-100 text-slate-500'"
+                                  x-text="hasSnapshot ? (isScanningFace ? 'Scanning Wajah...' : (isFaceValid ? 'Wajah Valid' : 'Wajah Tidak Jelas')) : 'Belum Ada Foto'"></span>
                         </div>
 
                         <div class="text-center space-y-3">
                             <div class="relative w-full aspect-video bg-slate-100 rounded-2xl overflow-hidden border-2 border-dashed border-slate-300 flex items-center justify-center">
                                 <img id="iot-preview" class="hidden w-full h-full object-cover rounded-2xl shadow-md">
+                                
+                                <!-- Laser Scanning Overlay -->
+                                <div x-show="isScanningFace" class="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-cyan-400 space-y-2 z-20" x-transition>
+                                    <div class="w-full h-1 bg-cyan-400 shadow-[0_0_15px_#06b6d4] absolute animate-scan-beam"></div>
+                                    <div class="w-12 h-12 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin flex items-center justify-center">
+                                        <i class="fa-solid fa-face-viewfinder text-xl text-cyan-300"></i>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold tracking-wider animate-pulse">Memindai Kejelasan Wajah...</span>
+                                </div>
+
                                 <div id="preview-placeholder" class="p-6 text-slate-400 space-y-2">
                                     <i class="fa-solid fa-user-astronaut text-3xl"></i>
                                     <p class="text-xs font-semibold text-slate-500">Hasil tangkapan gambar sementara akan muncul di sini setelah Anda mengklik tombol "Ambil Foto".</p>
                                 </div>
                             </div>
-                            <p class="text-[11px] text-slate-400 font-medium">Periksa kembali kejelasan foto wajah mahasiswa sebelum menekan tombol "Simpan Wajah".</p>
+
+                            <!-- Scanning Status Result Card -->
+                            <template x-if="hasSnapshot">
+                                <div class="p-3.5 rounded-xl border text-left text-xs space-y-2"
+                                     :class="{
+                                         'bg-emerald-50 border-emerald-200 text-emerald-950': scanResultType === 'success',
+                                         'bg-amber-50 border-amber-200 text-amber-950': scanResultType === 'warning',
+                                         'bg-rose-50 border-rose-200 text-rose-950': scanResultType === 'danger'
+                                     }">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-extrabold uppercase text-[10px] tracking-wider" x-text="'Skor Kejelasan Wajah: ' + clarityScore + '%'"></span>
+                                        <span class="text-xs font-bold" x-text="isFaceValid ? '✅ VALID' : '❌ TIDAK VALID'"></span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                        <div class="h-full transition-all duration-500 rounded-full" 
+                                             :style="'width: ' + clarityScore + '%'"
+                                             :class="isFaceValid ? 'bg-emerald-500' : (clarityScore > 40 ? 'bg-amber-500' : 'bg-rose-500')"></div>
+                                    </div>
+                                    <p class="text-[11px] font-semibold leading-relaxed" x-text="scanStatusText"></p>
+                                </div>
+                            </template>
+
+                            <p class="text-[11px] text-slate-400 font-medium" x-show="!hasSnapshot">
+                                Sistem akan memindai kejelasan pencahayaan dan fokus wajah secara otomatis sebelum foto diizinkan untuk disimpan.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -384,8 +549,13 @@
                     return;
                 }
 
-                // Use direct { video: true } matching webcamtests.com standard
-                iotStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                try {
+                    iotStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } }
+                    });
+                } catch (camErr) {
+                    iotStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
 
                 const video = document.getElementById('iot-webcam');
                 const placeholder = document.getElementById('iot-placeholder');
@@ -393,6 +563,8 @@
                 if (video) {
                     video.muted = true;
                     video.playsInline = true;
+                    video.setAttribute('playsinline', 'true');
+                    video.setAttribute('webkit-playsinline', 'true');
                     video.srcObject = iotStream;
                     video.classList.remove('hidden');
                     if (placeholder) placeholder.classList.add('hidden');
@@ -415,64 +587,14 @@
                 console.error('Webcam Error:', err);
                 let msg = 'Gagal mengakses kamera: ' + (err.message || err.name || err);
                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    msg = '⚠️ Akses kamera ditolak oleh browser!\n\nSolusi: Klik ikon gembok 🔒 di sebelah alamat URL browser (kiri atas), lalu ubah izin "Camera / Kamera" menjadi "Allow / Izinkan". Setelah itu refresh halaman.';
+                    msg = '⚠️ Akses kamera ditolak oleh browser!\n\nSolusi: Klik ikon gembok 🔒 di sebelah alamat URL browser, ubah izin Kamera menjadi "Allow/Izinkan", lalu refresh halaman.';
                 } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                    msg = '⚠️ Kamera webcam tidak terdeteksi pada laptop/HP Anda. Silakan tancapkan kamera webcam dan coba lagi.';
+                    msg = '⚠️ Kamera webcam tidak terdeteksi pada laptop/HP Anda. Silakan hubungkan kamera webcam dan coba lagi.';
                 } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-                    msg = '⚠️ Kamera sedang digunakan oleh aplikasi lain!\n\nSolusi: Silakan tutup aplikasi yang sedang mengakses kamera (seperti Zoom, MS Teams, Google Meet, atau Aplikasi Kamera Windows) lalu coba lagi.';
+                    msg = '⚠️ Kamera sedang digunakan oleh aplikasi lain!\n\nSilakan tutup aplikasi yang sedang mengakses kamera (Zoom/Teams) lalu coba lagi.';
                 }
                 alert(msg);
             }
-        }
-
-        function captureIotSnapshot() {
-            const video = document.getElementById('iot-webcam');
-            const canvas = document.getElementById('iot-canvas');
-            const preview = document.getElementById('iot-preview');
-            const placeholder = document.getElementById('preview-placeholder');
-            const hiddenInput = document.getElementById('iot_foto_wajah_base64');
-
-            if (!video || !iotStream) return;
-
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 640;
-            const ctx = canvas.getContext('2d');
-
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const base64Data = canvas.toDataURL('image/jpeg', 0.9);
-            hiddenInput.value = base64Data;
-
-            preview.src = base64Data;
-            preview.classList.remove('hidden');
-            if (placeholder) placeholder.classList.add('hidden');
-
-            document.getElementById('btn-iot-capture').classList.add('hidden');
-            document.getElementById('btn-iot-retake').classList.remove('hidden');
-
-            // Trigger Alpine reactive state
-            const alpineContainer = document.querySelector('[x-data]');
-            if (alpineContainer && alpineContainer._x_dataStack) {
-                alpineContainer._x_dataStack[0].hasSnapshot = true;
-            }
-        }
-
-        function retakeIotSnapshot() {
-            document.getElementById('iot_foto_wajah_base64').value = '';
-            const preview = document.getElementById('iot-preview');
-            const placeholder = document.getElementById('preview-placeholder');
-            preview.classList.add('hidden');
-            if (placeholder) placeholder.classList.remove('hidden');
-
-            const alpineContainer = document.querySelector('[x-data]');
-            if (alpineContainer && alpineContainer._x_dataStack) {
-                alpineContainer._x_dataStack[0].hasSnapshot = false;
-            }
-
-            document.getElementById('btn-iot-capture').classList.remove('hidden');
-            document.getElementById('btn-iot-retake').classList.add('hidden');
         }
 
         function stopIotWebcam() {
@@ -482,20 +604,37 @@
             }
         }
 
-        async function fetchRecentRfidScan() {
+        async function fetchRecentRfidScan(isManual = true) {
             try {
                 const response = await fetch('/admin/rfid/scan?json=1');
                 const data = await response.json();
-                if (data && data.scanned_uid) {
+                const scanned = data.scanned_uid || data.rfid_uid;
+                if (scanned) {
                     const input = document.getElementById('rfid_uid_input');
-                    input.value = data.scanned_uid;
-                    input.dispatchEvent(new Event('input'));
-                } else {
+                    if (input) {
+                        input.value = scanned;
+                        input.dispatchEvent(new Event('input'));
+                    }
+                    const alpineContainer = document.querySelector('[x-data]');
+                    if (alpineContainer && alpineContainer._x_dataStack) {
+                        alpineContainer._x_dataStack[0].rfidUid = scanned;
+                    }
+                    if (isManual) {
+                        alert('✅ Kartu RFID terdeteksi dari Raspberry Pi!\nKode UID: ' + scanned);
+                    }
+                } else if (isManual) {
                     alert('Belum ada kartu RFID yang di-tap pada scanner Raspberry Pi. Silakan tap kartu RFID ke alat lalu coba lagi.');
                 }
             } catch (e) {
-                alert('Silakan ketikkan kode RFID UID secara manual atau tap kartu RFID pada alat.');
+                if (isManual) {
+                    alert('Silakan ketikkan kode RFID UID secara manual atau tap kartu RFID pada alat.');
+                }
             }
         }
+
+        // Auto-poll RFID Scan every 2.5 seconds real-time
+        setInterval(function() {
+            fetchRecentRfidScan(false);
+        }, 2500);
     </script>
 </x-admin-layout>

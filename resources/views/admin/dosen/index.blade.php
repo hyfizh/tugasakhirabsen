@@ -43,7 +43,6 @@
                             <th class="py-4 px-6">NIP / ID IOT</th>
                             <th class="py-4 px-6">NAMA LENGKAP</th>
                             <th class="py-4 px-6 text-center">KONTAK</th>
-                            <th class="py-4 px-6 text-center">STATUS AKSES</th>
                             <th class="py-4 px-6 text-right">AKSI</th>
                         </tr>
                     </thead>
@@ -80,28 +79,15 @@
                                     <span class="text-[11px] text-slate-400 font-medium block mt-0.5">{{ $dept }}</span>
                                 </td>
 
-                                <!-- KONTAK WhatsApp -->
+                                 <!-- KONTAK WhatsApp -->
                                 <td class="py-4 px-6 text-center">
                                     @if ($dsn->no_hp)
-                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $dsn->no_hp) }}" target="_blank" 
-                                           class="px-3.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold text-xs rounded-full border border-emerald-200/80 inline-flex items-center transition-colors">
-                                            <i class="fa-brands fa-whatsapp text-sm mr-1.5"></i> Hubungi
+                                        <a href="https://wa.me/{{ str_starts_with($dsn->no_hp, '0') ? '62' . substr($dsn->no_hp, 1) : preg_replace('/[^0-9]/', '', $dsn->no_hp) }}" target="_blank" 
+                                           class="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200/80 inline-flex items-center transition-colors">
+                                            <i class="fa-brands fa-whatsapp text-sm mr-1.5 text-emerald-600"></i> {{ $dsn->no_hp }}
                                         </a>
                                     @else
                                         <span class="text-slate-400 font-medium">-</span>
-                                    @endif
-                                </td>
-
-                                <!-- STATUS AKSES -->
-                                <td class="py-4 px-6 text-center">
-                                    @if (!$isSuspended)
-                                        <span class="px-3.5 py-1 bg-emerald-100/70 text-emerald-700 font-bold text-[11px] rounded-full inline-flex items-center">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span> Account Active
-                                        </span>
-                                    @else
-                                        <span class="px-3.5 py-1 bg-slate-100 text-slate-500 font-bold text-[11px] rounded-full inline-flex items-center">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-2"></span> Inactive / Suspend
-                                        </span>
                                     @endif
                                 </td>
 
@@ -115,7 +101,7 @@
                                         </button>
                                         
                                         <!-- Delete Trash Icon Button -->
-                                        <form action="{{ route('admin.dosen.destroy', $dsn->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Apakah Anda yakin ingin menghapus dosen ini beserta akun loginnya?');">
+                                        <form action="{{ route('admin.dosen.destroy', $dsn->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Apakah Anda yakin ingin menghapus dosen ini?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="text-slate-400 hover:text-rose-600 transition-colors p-1" title="Hapus Dosen">
@@ -126,69 +112,10 @@
                                 </td>
                             </tr>
                         @empty
-                            <!-- Demo Rows Matching User Mockup if empty -->
-                            <tr class="hover:bg-slate-50/80 transition-colors">
-                                <td class="py-4 px-6 text-center">
-                                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120" 
-                                         alt="Avatar" class="w-9 h-9 rounded-full object-cover shadow-sm mx-auto">
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="bg-slate-100/90 text-slate-700 font-mono text-xs px-3 py-1.5 rounded-lg font-semibold inline-block border border-slate-200/50">
-                                        198005122005011001
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="font-extrabold text-slate-900 text-sm block leading-tight">Dr. Budi Santoso, M.Kom</span>
-                                    <span class="text-[11px] text-slate-400 font-medium block mt-0.5">Fakultas Ilmu Komputer</span>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <a href="#" class="px-3.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold text-xs rounded-full border border-emerald-200/80 inline-flex items-center transition-colors">
-                                        <i class="fa-brands fa-whatsapp text-sm mr-1.5"></i> Hubungi
-                                    </a>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-emerald-100/70 text-emerald-700 font-bold text-[11px] rounded-full inline-flex items-center">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span> Account Active
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-right">
-                                    <div class="flex items-center justify-end space-x-2.5">
-                                        <button class="text-slate-400 hover:text-indigo-600 transition-colors p-1"><i class="fa-solid fa-pencil text-sm"></i></button>
-                                        <button class="text-slate-400 hover:text-rose-600 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <tr class="hover:bg-slate-50/80 transition-colors">
-                                <td class="py-4 px-6 text-center">
-                                    <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center mx-auto text-xs shadow-sm">
-                                        SR
-                                    </div>
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="bg-slate-100/90 text-slate-700 font-mono text-xs px-3 py-1.5 rounded-lg font-semibold inline-block border border-slate-200/50">
-                                        198511222010122003
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="font-extrabold text-slate-900 text-sm block leading-tight">Siti Rahmawati, M.T</span>
-                                    <span class="text-[11px] text-slate-400 font-medium block mt-0.5">Fakultas Teknik</span>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <a href="#" class="px-3.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold text-xs rounded-full border border-emerald-200/80 inline-flex items-center transition-colors">
-                                        <i class="fa-brands fa-whatsapp text-sm mr-1.5"></i> Hubungi
-                                    </a>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-slate-100 text-slate-500 font-bold text-[11px] rounded-full inline-flex items-center">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-2"></span> Inactive / Suspend
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-right">
-                                    <div class="flex items-center justify-end space-x-2.5">
-                                        <button class="text-slate-400 hover:text-indigo-600 transition-colors p-1"><i class="fa-solid fa-pencil text-sm"></i></button>
-                                        <button class="text-slate-400 hover:text-rose-600 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                                    </div>
+                            <tr>
+                                <td colspan="5" class="py-12 text-center text-slate-400">
+                                    <i class="fa-solid fa-user-slash text-3xl mb-2 text-slate-300 block"></i>
+                                    Belum ada data dosen terdaftar.
                                 </td>
                             </tr>
                         @endforelse
@@ -264,25 +191,6 @@
                         <input type="text" name="no_hp" id="no_hp" placeholder="Contoh: 0812..." value="{{ old('no_hp') }}"
                                class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
                         @error('no_hp') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div class="border-t border-slate-100 pt-4">
-                        <h4 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">Akun Kredensial Login</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="username" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Username</label>
-                                <input type="text" name="username" id="username" required placeholder="dosenusername" value="{{ old('username') }}"
-                                       class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
-                                @error('username') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-
-                            <div>
-                                <label for="password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Password</label>
-                                <input type="password" name="password" id="password" required placeholder="••••••••"
-                                       class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
-                                @error('password') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                        </div>
                     </div>
 
                     <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">

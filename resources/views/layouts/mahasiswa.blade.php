@@ -52,8 +52,15 @@
         }
     </style>
 </head>
-<body class="bg-dashboard text-slate-800 antialiased font-sans h-screen overflow-hidden" x-data="{ isMobile: window.innerWidth < 768 }" @resize.window="isMobile = window.innerWidth < 768">
-    <div class="h-screen w-screen flex overflow-hidden bg-dashboard" x-data="{ sidebarOpen: window.innerWidth >= 768 }">
+<body class="bg-dashboard text-slate-800 antialiased font-sans min-h-screen md:h-screen md:overflow-hidden overscroll-y-auto" x-data="{ isMobile: window.innerWidth < 768 }" @resize.window="isMobile = window.innerWidth < 768">
+    
+    <!-- Mobile Pull to Refresh Indicator -->
+    <div id="mobile-ptr-indicator" class="fixed top-2 left-1/2 -translate-x-1/2 z-50 hidden bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg transition-transform flex items-center space-x-2">
+        <i class="fa-solid fa-rotate animate-spin"></i>
+        <span>Memperbarui Halaman...</span>
+    </div>
+
+    <div class="min-h-screen md:h-screen w-full flex overflow-x-hidden md:overflow-hidden bg-dashboard" x-data="{ sidebarOpen: window.innerWidth >= 768 }">
         
         <!-- Mobile Sidebar Dark Backdrop Overlay -->
         <div x-show="sidebarOpen && isMobile" 
@@ -164,6 +171,11 @@
                         <i class="fa-regular fa-clock text-indigo-600"></i>
                         <span id="current-time">Loading Clock...</span>
                     </div>
+
+                    <!-- Quick Refresh Button for Mobile & Desktop -->
+                    <button onclick="window.location.reload()" title="Refresh Halaman" class="p-2 text-indigo-600 hover:text-indigo-800 transition-colors focus:outline-none bg-indigo-50 hover:bg-indigo-100 rounded-full active:scale-95 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-rotate text-sm"></i>
+                    </button>
 
                     <!-- Notification Bell -->
                     <button class="relative p-2 text-slate-500 hover:text-slate-800 transition-colors focus:outline-none">
@@ -309,6 +321,45 @@
             window.addEventListener('pageshow', function () {
                 hideLoading();
             });
+
+            // Mobile Pull-to-Refresh Gesture Handler
+            (function() {
+                let startY = 0;
+                let isPulling = false;
+                const threshold = 60;
+                const mainEl = document.querySelector('main');
+                const ptrIndicator = document.getElementById('mobile-ptr-indicator');
+
+                window.addEventListener('touchstart', function(e) {
+                    const mainTop = mainEl ? mainEl.scrollTop : 0;
+                    if (window.scrollY === 0 || mainTop === 0) {
+                        startY = e.touches[0].pageY;
+                        isPulling = true;
+                    }
+                }, { passive: true });
+
+                window.addEventListener('touchmove', function(e) {
+                    if (!isPulling) return;
+                    const currentY = e.touches[0].pageY;
+                    const diffY = currentY - startY;
+                    const mainTop = mainEl ? mainEl.scrollTop : 0;
+
+                    if (diffY > threshold && (window.scrollY === 0 || mainTop === 0)) {
+                        if (ptrIndicator) {
+                            ptrIndicator.classList.remove('hidden');
+                        }
+                    }
+                }, { passive: true });
+
+                window.addEventListener('touchend', function(e) {
+                    if (isPulling && ptrIndicator && !ptrIndicator.classList.contains('hidden')) {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 250);
+                    }
+                    isPulling = false;
+                });
+            })();
         });
     </script>
 </body>

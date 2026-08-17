@@ -104,61 +104,38 @@
             <!-- Right Panel (5 cols): Edge Reader Status -->
             <div class="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-5">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-base font-bold text-slate-800 tracking-tight">Edge Reader Status</h2>
-                    <span class="px-3 py-1 bg-indigo-50 text-indigo-600 text-[11px] font-extrabold rounded-full tracking-wide">
-                        Live Monitor
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 tracking-tight">Edge Reader Status</h2>
+                        <p class="text-[11px] font-semibold text-slate-400 mt-0.5">{{ count($iotDevices ?? []) }} Perangkat IoT Terdaftar</p>
+                    </div>
+                    <span class="px-3 py-1 bg-emerald-50 text-emerald-600 text-[11px] font-extrabold rounded-full tracking-wide flex items-center space-x-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Live Monitor</span>
                     </span>
                 </div>
 
                 <!-- Readers List -->
                 <div class="space-y-4">
-                    <!-- Reader 1 -->
-                    <div class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                        <div class="flex items-center space-x-3.5">
-                            <span class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-sm">
-                                <i class="fa-solid fa-wifi"></i>
-                            </span>
-                            <div>
-                                <h4 class="text-sm font-bold text-slate-800">Reader-01 (Main Gate)</h4>
-                                <p class="text-xs text-slate-400 font-mono">IP: 192.168.1.101</p>
+                    @forelse ($iotDevices ?? [] as $dev)
+                        <div class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors border border-slate-100/60">
+                            <div class="flex items-center space-x-3.5">
+                                <span class="w-10 h-10 rounded-full {{ $dev->is_online ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-100 text-rose-600' }} flex items-center justify-center text-sm shadow-xs">
+                                    <i class="fa-solid {{ $dev->icon ?? ($dev->is_online ? 'fa-wifi' : 'fa-wifi-slash') }}"></i>
+                                </span>
+                                <div>
+                                    <h4 class="text-xs font-extrabold text-slate-800">{{ $dev->nama }}</h4>
+                                    <p class="text-[10px] text-slate-400 font-mono mt-0.5">IP: {{ $dev->ip }} &bull; {{ $dev->lokasi }}</p>
+                                </div>
                             </div>
-                        </div>
-                        <span class="flex items-center text-xs font-semibold text-slate-600">
-                            Online <span class="w-2 h-2 rounded-full bg-indigo-600 ml-2"></span>
-                        </span>
-                    </div>
-
-                    <!-- Reader 2 -->
-                    <div class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                        <div class="flex items-center space-x-3.5">
-                            <span class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-sm">
-                                <i class="fa-solid fa-wifi"></i>
+                            <span class="flex items-center text-xs font-bold {{ $dev->is_online ? 'text-emerald-600' : 'text-rose-600 font-extrabold' }}">
+                                {{ $dev->status }} <span class="w-2.5 h-2.5 rounded-full {{ $dev->is_online ? 'bg-emerald-500' : 'bg-rose-500' }} ml-2 shadow-xs"></span>
                             </span>
-                            <div>
-                                <h4 class="text-sm font-bold text-slate-800">Reader-02 (Library)</h4>
-                                <p class="text-xs text-slate-400 font-mono">IP: 192.168.1.102</p>
-                            </div>
                         </div>
-                        <span class="flex items-center text-xs font-semibold text-slate-600">
-                            Online <span class="w-2 h-2 rounded-full bg-indigo-600 ml-2"></span>
-                        </span>
-                    </div>
-
-                    <!-- Reader 3 -->
-                    <div class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                        <div class="flex items-center space-x-3.5">
-                            <span class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-sm">
-                                <i class="fa-solid fa-wifi-slash"></i>
-                            </span>
-                            <div>
-                                <h4 class="text-sm font-bold text-slate-800">Reader-03 (Lab A)</h4>
-                                <p class="text-xs text-slate-400 font-mono">IP: 192.168.1.103</p>
-                            </div>
+                    @empty
+                        <div class="text-center py-6 text-slate-400 text-xs font-medium">
+                            Belum ada perangkat IoT terdaftar.
                         </div>
-                        <span class="flex items-center text-xs font-semibold text-slate-400">
-                            Offline <span class="w-2 h-2 rounded-full bg-slate-400 ml-2"></span>
-                        </span>
-                    </div>
+                    @endforelse
                 </div>
             </div>
 

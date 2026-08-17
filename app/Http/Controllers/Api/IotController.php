@@ -76,13 +76,13 @@ class IotController extends Controller
         $lateStart  = date('H:i', strtotime($endTime . ' - 15 minutes'));
         $lateEnd    = date('H:i', strtotime($endTime . ' + 15 minutes'));
 
-        // Jika tap berada di Window 15 Menit Awal ATAU Window 15 Menit Akhir
+        // Jika tap berada di Window 15 Menit Awal (07:15 - 07:45 untuk jam 07:30) ATAU Window 15 Menit Akhir
         if (($time >= $earlyStart && $time <= $earlyEnd) || ($time >= $lateStart && $time <= $lateEnd)) {
             return 'H'; // Hadir Tepat Waktu / Presensi Valid Sesi
         }
 
-        // Jika tap di tengah-tengah rentang waktu perkuliahan (> 15 menit awal & < 15 menit akhir)
-        return 'T'; // Terlambat
+        // Jika lewat dari 15 menit awal (misal lewat dari 07:45), langsung dicatat Alpa ('A')
+        return 'A'; // Alpa langsung
     }
 
     public function verify(Request $request)
@@ -97,16 +97,20 @@ class IotController extends Controller
             // 1. Find Mahasiswa
             $mahasiswa = Mahasiswa::where('rfid_uid', $uid)->first();
             if (!$mahasiswa) {
+                // Cache UID for 60 seconds so the Admin Web interface auto-populates it!
+                Cache::put('temp_rfid_uid', $uid, 60);
+
                 AuditLog::create([
-                    'tipe_log' => 'ACCESS_DENIED',
-                    'deskripsi' => "Akses Ditolak: Kartu RFID dengan UID $uid tidak terdaftar.",
+                    'tipe_log' => 'RFID_SCANNED',
+                    'deskripsi' => "Kartu RFID baru di-tap: $uid (Menunggu Pendaftaran ke Mahasiswa)",
                     'ip_address' => $request->ip(),
                 ]);
 
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Kartu RFID tidak dikenal.',
-                ], 404);
+                    'status' => 'unregistered',
+                    'scanned_uid' => $uid,
+                    'message' => 'Kartu RFID baru terdeteksi! Kode UID tersimpan sementara untuk pendaftaran.',
+                ], 200);
             }
 
             // 2. Determine Day and Time Slot

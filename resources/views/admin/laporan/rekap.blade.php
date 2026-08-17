@@ -5,7 +5,7 @@
                 size: A4 landscape;
                 margin: 1cm 1.5cm;
             }
-            .no-print, header, aside, .sidebar-wrapper, nav, button, form {
+            .no-print, header, aside, .sidebar-wrapper, nav, button, form, .no-print * {
                 display: none !important;
             }
             body, html, main {
@@ -20,6 +20,9 @@
                 border: none !important;
                 box-shadow: none !important;
                 padding: 0 !important;
+            }
+            .print-tab-active {
+                display: block !important;
             }
             table {
                 width: 100% !important;
@@ -46,8 +49,7 @@
 
     <div class="space-y-6 pb-6" x-data="{
         selectedKelas: '{{ $selectedKelas->nama_kelas ?? 'Teknologi Informasi 3A' }}',
-        selectedMatkul: 'Rancang Bangun IoT',
-        selectedPeriode: 'Oktober 2023',
+        rekapTab: 'mingguan',
         openModal: false
     }">
         
@@ -57,8 +59,8 @@
             <h1 class="text-lg font-extrabold uppercase tracking-wider text-black mt-0.5">POLITEKNIK NEGERI PADANG</h1>
             <p class="text-xs text-slate-700 font-medium">Kampus Limau Manis, Pauh, Kota Padang, Sumatera Barat 25163 &bull; Telepon: (0751) 72590</p>
             <div class="border-t border-slate-900 mt-2 pt-2">
-                <h3 class="text-sm font-extrabold uppercase underline text-black">LAPORAN REKAPITULASI PRESENSI MAHASISWA</h3>
-                <p class="text-xs font-semibold text-slate-800 mt-0.5">Kelas: {{ $selectedKelas->nama_kelas ?? 'TI-3A' }} &bull; Semester: Ganjil &bull; Tahun Akademik 2023/2024</p>
+                <h3 class="text-sm font-extrabold uppercase underline text-black" x-text="rekapTab === 'mingguan' ? 'LAPORAN REKAPITULASI PRESENSI MINGGUAN (SENIN - SABTU)' : 'LAPORAN REKAPITULASI TOTAL PRESENSI MAHASISWA'"></h3>
+                <p class="text-xs font-semibold text-slate-800 mt-0.5">Kelas: {{ $selectedKelas->nama_kelas ?? 'TI-3A' }} &bull; Periode: {{ $monthsList[$bulan] ?? '' }} {{ $tahun }} &bull; Semester: Ganjil</p>
             </div>
         </div>
 
@@ -66,16 +68,16 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 no-print">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Laporan Kehadiran</h1>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1">Generate and export attendance reports based on IoT sensor data.</p>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1">Rekapitulasi Presensi Mingguan &amp; Bulanan Mahasiswa berbasis IoT Sensor.</p>
             </div>
         </div>
 
-        <!-- Filter Bar Card (3 Dropdowns + Auto Submit) (Screen Only) -->
+        <!-- Filter Bar Card (3 Dropdowns: Kelas, Bulan, Tahun) (Screen Only) -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 no-print">
             <form action="{{ route('admin.laporan.rekap') }}" method="GET" id="rekap-filter-form" class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
                 
                 <!-- KELAS -->
-                <div class="sm:col-span-3">
+                <div class="sm:col-span-4">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">KELAS</label>
                     <select name="kelas_id" id="kelas_id" onchange="this.form.submit()" 
                             class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
@@ -87,22 +89,8 @@
                     </select>
                 </div>
 
-                <!-- MATA KULIAH -->
-                <div class="sm:col-span-4">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MATA KULIAH</label>
-                    <select name="mata_kuliah_id" id="mata_kuliah_id" onchange="this.form.submit()"
-                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
-                        <option value="">-- Semua Mata Kuliah --</option>
-                        @foreach ($mataKuliahList as $mk)
-                            <option value="{{ $mk->id }}" {{ (string)$selectedMatkulId === (string)$mk->id ? 'selected' : '' }}>
-                                {{ $mk->kode_mk }} - {{ $mk->nama_mk }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
                 <!-- BULAN -->
-                <div class="sm:col-span-2">
+                <div class="sm:col-span-4">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">BULAN</label>
                     <select name="bulan" id="bulan" onchange="this.form.submit()"
                             class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
@@ -115,7 +103,7 @@
                 </div>
 
                 <!-- TAHUN -->
-                <div class="sm:col-span-3">
+                <div class="sm:col-span-4">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">TAHUN</label>
                     <select name="tahun" id="tahun" onchange="this.form.submit()"
                             class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
@@ -135,37 +123,136 @@
             <!-- Card Header: Title & Export Buttons -->
             <div class="p-6 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 no-print">
                 <div>
-                    <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Preview Laporan</h3>
+                    <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Preview Laporan Presensi</h3>
                     <p class="text-xs text-slate-500 font-medium mt-0.5">
                         <span>{{ $selectedKelas->nama_kelas ?? 'TI-3A' }}</span> - Periode {{ $monthsList[$bulan] ?? '' }} {{ $tahun }}
                     </p>
                 </div>
 
-                <!-- Action Buttons: Ubah Status Absensi (Sakit/Izin) & Export PDF -->
+                <!-- Action Buttons: Ubah Status Absensi (Sakit/Izin) & Download Direct PDF -->
                 <div class="flex flex-wrap items-center gap-2.5 no-print">
                     <button type="button" @click="openModal = true" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-sm hover:shadow-md transition-all inline-flex items-center">
                         <i class="fa-solid fa-file-medical mr-2 text-sm"></i> Ubah Status Absensi (Sakit / Izin)
                     </button>
-                    <button onclick="window.print()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all inline-flex items-center shadow-sm">
-                        <i class="fa-solid fa-file-pdf text-rose-500 mr-2 text-sm"></i> Export PDF
-                    </button>
-                    <button onclick="window.print()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all inline-flex items-center shadow-sm">
-                        <i class="fa-solid fa-print text-slate-500 mr-2 text-sm"></i> Print Report
-                    </button>
+                    <a :href="'{{ route('admin.laporan.rekap.download-pdf') }}?kelas_id={{ $selectedKelasId }}&bulan={{ $bulan }}&tahun={{ $tahun }}&type=' + rekapTab" 
+                       target="_blank"
+                       class="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md hover:shadow-lg transition-all inline-flex items-center">
+                        <i class="fa-solid fa-file-pdf mr-2 text-sm"></i> Download PDF
+                    </a>
                 </div>
             </div>
 
-            <!-- Table Section -->
-            <div class="overflow-x-auto">
+            <!-- TAB MODE SWITCHER (Mingguan vs Bulanan Total) -->
+            <div class="flex border-b border-slate-100 space-x-2 px-6 no-print">
+                <button type="button" 
+                        @click="rekapTab = 'mingguan'" 
+                        :class="rekapTab === 'mingguan' ? 'border-indigo-600 text-indigo-600 font-extrabold bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 font-bold'"
+                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl">
+                    <i class="fa-solid fa-calendar-week"></i>
+                    <span>(1) Rekap Absen Mingguan (Per Hari: Senin - Sabtu)</span>
+                </button>
+                <button type="button" 
+                        @click="rekapTab = 'bulanan'" 
+                        :class="rekapTab === 'bulanan' ? 'border-indigo-600 text-indigo-600 font-extrabold bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 font-bold'"
+                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>(2) Rekap Total Bulanan &amp; Persentase (%)</span>
+                </button>
+            </div>
+
+            <!-- MODE 1: TABEL REKAP ABSEN MINGGUAN (Senin s/d Sabtu) -->
+            <div x-show="rekapTab === 'mingguan'" :class="rekapTab === 'mingguan' ? 'print-tab-active' : ''" x-transition class="overflow-x-auto">
                 <table class="w-full text-left text-xs border-collapse">
                     <thead>
                         <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
                             <th class="py-3.5 px-6">NIM</th>
                             <th class="py-3.5 px-6">NAMA MAHASISWA</th>
-                            <th class="py-3.5 px-4 text-center">H</th>
-                            <th class="py-3.5 px-4 text-center">I</th>
-                            <th class="py-3.5 px-4 text-center">S</th>
-                            <th class="py-3.5 px-4 text-center">A</th>
+                            @foreach ($daysOfWeek as $dayName => $dateVal)
+                                <th class="py-3.5 px-4 text-center min-w-[70px]">
+                                    <div class="text-slate-700 font-extrabold">{{ strtoupper($dayName) }}</div>
+                                    <div class="text-[9px] text-slate-400 font-normal font-mono">{{ date('d/m', strtotime($dateVal)) }}</div>
+                                </th>
+                            @endforeach
+                            <th class="py-3.5 px-4 text-center bg-purple-50/60 text-purple-700">S</th>
+                            <th class="py-3.5 px-4 text-center bg-sky-50/60 text-sky-700">I</th>
+                            <th class="py-3.5 px-4 text-center bg-rose-50/60 text-rose-700">A</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium">
+                        @forelse ($students as $mhs)
+                            @php
+                                $sakitW = $weeklyTotals[$mhs->id]['S'] ?? 0;
+                                $izinW = $weeklyTotals[$mhs->id]['I'] ?? 0;
+                                $alpaW = $weeklyTotals[$mhs->id]['A'] ?? 0;
+                            @endphp
+                            <tr class="hover:bg-slate-50/80 transition-colors">
+                                <td class="py-4 px-6 font-mono text-slate-500 text-xs">{{ $mhs->nim }}</td>
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center space-x-3">
+                                        @if ($mhs->foto_wajah)
+                                            <img src="{{ asset('storage/' . $mhs->foto_wajah) }}" alt="Avatar" class="w-7 h-7 rounded-full object-cover shadow-sm no-print">
+                                        @else
+                                            <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-extrabold text-[10px] flex items-center justify-center no-print">
+                                                {{ strtoupper(substr($mhs->nama_lengkap, 0, 2)) }}
+                                            </div>
+                                        @endif
+                                        <span class="font-bold text-slate-800 text-xs">{{ $mhs->nama_lengkap }}</span>
+                                    </div>
+                                </td>
+
+                                @foreach ($daysOfWeek as $dayName => $dateVal)
+                                    @php
+                                        $status = null;
+                                        if (isset($weeklyAbsensi[$mhs->id][$dateVal])) {
+                                            foreach ($weeklyAbsensi[$mhs->id][$dateVal] as $jam => $st) {
+                                                $status = $st;
+                                            }
+                                        }
+                                    @endphp
+                                    <td class="py-4 px-4 text-center">
+                                        @if ($status === 'H')
+                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-md shadow-xs">H</span>
+                                        @elseif ($status === 'T')
+                                            <span class="px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold rounded-md shadow-xs">T</span>
+                                        @elseif ($status === 'I')
+                                            <span class="px-2 py-1 bg-sky-100 text-sky-800 text-[10px] font-extrabold rounded-md shadow-xs">I</span>
+                                        @elseif ($status === 'S')
+                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-[10px] font-extrabold rounded-md shadow-xs">S</span>
+                                        @elseif ($status === 'A')
+                                            <span class="px-2 py-1 bg-rose-100 text-rose-800 text-[10px] font-extrabold rounded-md shadow-xs">A</span>
+                                        @else
+                                            <span class="text-slate-300 font-mono text-[10px]">-</span>
+                                        @endif
+                                    </td>
+                                @endforeach
+
+                                <td class="py-4 px-4 text-center text-slate-500 font-bold text-xs bg-purple-50/20">{{ $sakitW }}</td>
+                                <td class="py-4 px-4 text-center text-slate-500 font-bold text-xs bg-sky-50/20">{{ $izinW }}</td>
+                                <td class="py-4 px-4 text-center font-bold {{ $alpaW > 0 ? 'text-rose-600 font-extrabold' : 'text-slate-500' }} text-xs bg-rose-50/20">{{ $alpaW }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="11" class="py-12 px-6 text-center text-slate-400">
+                                    <i class="fa-solid fa-calendar-xmark text-3xl mb-2 text-slate-300 block"></i>
+                                    Tidak ada data mahasiswa atau jadwal kuliah pada kelas ini.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MODE 2: TABEL REKAP BULANAN TOTAL & PERSENTASE -->
+            <div x-show="rekapTab === 'bulanan'" :class="rekapTab === 'bulanan' ? 'print-tab-active' : ''" x-transition class="overflow-x-auto" style="display: none;">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
+                            <th class="py-3.5 px-6">NIM</th>
+                            <th class="py-3.5 px-6">NAMA MAHASISWA</th>
+                            <th class="py-3.5 px-4 text-center">HADIR (H)</th>
+                            <th class="py-3.5 px-4 text-center">IZIN (I)</th>
+                            <th class="py-3.5 px-4 text-center">SAKIT (S)</th>
+                            <th class="py-3.5 px-4 text-center">ALPA (A)</th>
                             <th class="py-3.5 px-6">KEHADIRAN (%)</th>
                         </tr>
                     </thead>
@@ -246,8 +333,11 @@
                     <p class="font-bold underline">Admin EduAttend IoT</p>
                     <p>NIP/NIDN. System Generated</p>
                 </div>
+            </div>
+        </div>
+
         <!-- MODAL UBAH STATUS ABSENSI MAHASISWA (SURAT SAKIT / IZIN) -->
-        <div x-show="openModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div x-show="openModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true" style="display: none;">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                 <!-- Backdrop -->
                 <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" @click="openModal = false"></div>

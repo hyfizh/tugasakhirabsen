@@ -140,16 +140,6 @@
             <!-- Table Header Bar -->
             <div class="p-6 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 no-print">
                 <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Data Kompensasi & SP</h3>
-
-                <!-- Export & Print PDF Buttons -->
-                <div class="flex items-center space-x-2.5 no-print">
-                    <button onclick="window.print()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all inline-flex items-center shadow-sm">
-                        <i class="fa-solid fa-file-pdf text-rose-500 mr-2 text-sm"></i> Export PDF
-                    </button>
-                    <button onclick="window.print()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all inline-flex items-center">
-                        <i class="fa-solid fa-print mr-2 text-xs"></i> Cetak Laporan PDF
-                    </button>
-                </div>
             </div>
 
             <!-- Table Section -->

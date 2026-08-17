@@ -43,6 +43,54 @@ class AdminController extends Controller
             ->take(5)
             ->get();
 
+        // Dynamic Network Reachability Check for IoT Devices
+        $checkOnline = function($ip, $port = 80, $timeout = 1) {
+            $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+            if ($fp) {
+                fclose($fp);
+                return true;
+            }
+            $isWin = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+            $cmd = $isWin
+                ? "ping -n 1 -w 300 " . escapeshellarg($ip)
+                : "ping -c 1 -W 1 " . escapeshellarg($ip);
+            @exec($cmd, $output, $status);
+            return $status === 0;
+        };
+
+        $perangkats = \App\Models\Perangkat::all();
+        if ($perangkats->isEmpty()) {
+            \App\Models\Perangkat::create([
+                'kode' => 'RASPBERRY-PI3-RFID',
+                'nama' => 'Raspberry Pi 3 - RFID Reader',
+                'sn' => 'RPI3-2026-RFID-01',
+                'tipe' => 'RC522 RFID Reader',
+                'lokasi' => 'Stasiun Sensor Alat (Lab IoT TI)',
+                'ip_address' => '192.168.1.23',
+                'mac_address' => 'B8:27:EB:41:89:A2',
+                'icon' => 'fa-id-card'
+            ]);
+            \App\Models\Perangkat::create([
+                'kode' => 'RASPBERRY-PI3-CAM',
+                'nama' => 'Raspberry Pi 3 - Camera Module',
+                'sn' => 'RPI3-2026-CAM-01',
+                'tipe' => 'Pi Camera Biometrik Wajah',
+                'lokasi' => 'Stasiun Sensor Alat (Lab IoT TI)',
+                'ip_address' => '192.168.1.23',
+                'mac_address' => 'B8:27:EB:41:89:A2',
+                'icon' => 'fa-camera'
+            ]);
+            $perangkats = \App\Models\Perangkat::all();
+        }
+
+        $iotDevices = $perangkats->map(function($p) use ($checkOnline) {
+            $isOnline = $checkOnline($p->ip_address, 80, 1);
+            $p->is_online = $isOnline;
+            $p->status = $isOnline ? 'Online' : 'Offline';
+            $p->ip = $p->ip_address;
+            return $p;
+        });
+
         return view('admin.dashboard', compact(
             'totalMahasiswa',
             'totalDosen',
@@ -53,7 +101,8 @@ class AdminController extends Controller
             'totalSp2',
             'totalSp3',
             'recentLogs',
-            'todayAbsensiList'
+            'todayAbsensiList',
+            'iotDevices'
         ));
     }
 
@@ -100,27 +149,15 @@ class AdminController extends Controller
             'nip' => 'required|string|unique:dosens,nip',
             'nama_dosen' => 'required|string|max:100',
             'no_hp' => 'nullable|string|max:20',
-            'username' => 'required|string|unique:users,username',
-            'password' => 'required|string|min:6',
         ]);
 
-        DB::transaction(function () use ($request) {
-            $user = User::query()->create([
-                'username' => $request->username,
-                'password' => Hash::make($request->password),
-                'role' => 'dosen',
-                'is_password_changed' => true, // default dosen already changed or set up
-            ]);
+        Dosen::query()->create([
+            'nip' => $request->nip,
+            'nama_dosen' => $request->nama_dosen,
+            'no_hp' => $request->no_hp,
+        ]);
 
-            Dosen::query()->create([
-                'user_id' => $user->id,
-                'nip' => $request->nip,
-                'nama_dosen' => $request->nama_dosen,
-                'no_hp' => $request->no_hp,
-            ]);
-        });
-
-        return redirect()->route('admin.dosen.index')->with('success', 'Dosen berhasil ditambahkan.');
+        return redirect()->route('admin.dosen.index')->with('success', 'Data Dosen berhasil ditambahkan.');
     }
 
     public function updateDosen(Request $request, Dosen $dosen)
@@ -132,17 +169,13 @@ class AdminController extends Controller
         ]);
 
         $dosen->update($request->only('nip', 'nama_dosen', 'no_hp'));
-        return redirect()->route('admin.dosen.index')->with('success', 'Dosen berhasil diperbarui.');
+        return redirect()->route('admin.dosen.index')->with('success', 'Data Dosen berhasil diperbarui.');
     }
 
     public function destroyDosen(Dosen $dosen)
     {
-        DB::transaction(function () use ($dosen) {
-            $user = $dosen->user;
-            $dosen->delete();
-            if ($user) $user->delete();
-        });
-        return redirect()->route('admin.dosen.index')->with('success', 'Dosen berhasil dihapus.');
+        $dosen->delete();
+        return redirect()->route('admin.dosen.index')->with('success', 'Data Dosen berhasil dihapus.');
     }
 
     // --- MAHASISWA CRUD ---
@@ -479,9 +512,10 @@ class AdminController extends Controller
         // For simulation, check if there's a cached RFID UID scanned
         $scannedUid = Cache::get('temp_rfid_uid');
         
-        if ($request->ajax()) {
+        if ($request->ajax() || $request->has('json') || $request->wantsJson()) {
             return response()->json([
-                'rfid_uid' => $scannedUid ?: null,
+                'scanned_uid' => $scannedUid ?: null,
+                'rfid_uid'    => $scannedUid ?: null,
             ]);
         }
 
@@ -524,18 +558,40 @@ class AdminController extends Controller
     // --- STASIUN REGISTRASI SENSOR IOT (RFID TAG & BIOMETRIK WAJAH WEBRTC) ---
     public function indexIotDevice()
     {
-        $mahasiswas = Mahasiswa::with(['kelas', 'user'])->orderBy('nama_lengkap', 'asc')->get();
-        
-        // Mahasiswa yang belum melengkapi RFID UID atau Foto Wajah
-        $mahasiswasPending = Mahasiswa::with(['kelas', 'user'])
+        // 1. Mahasiswa yang belum lengkap datanya (foto_wajah IS NULL ATAU rfid_uid IS NULL)
+        $mahasiswasIncomplete = Mahasiswa::with(['kelas', 'user'])
             ->where(function($query) {
                 $query->whereNull('foto_wajah')
-                      ->orWhereNull('rfid_uid');
+                      ->orWhere('foto_wajah', '')
+                      ->orWhereNull('rfid_uid')
+                      ->orWhere('rfid_uid', '');
             })
             ->orderBy('nama_lengkap', 'asc')
             ->get();
 
-        return view('admin.iot-device', compact('mahasiswas', 'mahasiswasPending'));
+        // 2. Mahasiswa yang mengajukan permohonan ubah foto
+        $studentIdsPermohonanFoto = \App\Models\PermohonanGantiFoto::query()
+            ->whereIn('status', ['pending', 'approved'])
+            ->pluck('mahasiswa_id');
+
+        $mahasiswasUbahFoto = Mahasiswa::with(['kelas', 'user'])
+            ->whereIn('id', $studentIdsPermohonanFoto)
+            ->orderBy('nama_lengkap', 'asc')
+            ->get();
+
+        // Combined target students for Alpine JS state lookup
+        $targetIds = $mahasiswasIncomplete->pluck('id')->merge($studentIdsPermohonanFoto)->unique();
+        $mahasiswas = Mahasiswa::with(['kelas', 'user'])
+            ->whereIn('id', $targetIds)
+            ->orderBy('nama_lengkap', 'asc')
+            ->get();
+
+        // Fallback: If no pending/incomplete targets, include all students
+        if ($mahasiswas->isEmpty()) {
+            $mahasiswas = Mahasiswa::with(['kelas', 'user'])->orderBy('nama_lengkap', 'asc')->get();
+        }
+
+        return view('admin.iot-device', compact('mahasiswas', 'mahasiswasIncomplete', 'mahasiswasUbahFoto'));
     }
 
     public function assignIotDevice(Request $request)
@@ -932,6 +988,89 @@ class AdminController extends Controller
         ));
     }
 
+    public function downloadRekapPdf(Request $request)
+    {
+        $kelas = Kelas::query()->get();
+        $selectedKelasId = $request->get('kelas_id', $kelas->first()->id ?? null);
+        $selectedKelas = Kelas::find($selectedKelasId);
+        $selectedMatkulId = $request->get('mata_kuliah_id', null);
+        $rekapTab = $request->get('type', 'mingguan');
+        
+        $bulan = (int) $request->input('bulan', date('m'));
+        $tahun = (int) $request->input('tahun', date('Y'));
+
+        $monthsList = [
+            1  => 'Januari',   2  => 'Februari', 3  => 'Maret',    4  => 'April',
+            5  => 'Mei',       6  => 'Juni',     7  => 'Juli',     8  => 'Agustus',
+            9  => 'September', 10 => 'Oktober',  11 => 'November', 12 => 'Desember'
+        ];
+
+        $dateStr = sprintf('%04d-%02d-01', $tahun, $bulan);
+        $timestamp = strtotime($dateStr);
+        $monday = date('Y-m-d', strtotime('monday this week', $timestamp));
+        $saturday = date('Y-m-d', strtotime('saturday this week', $timestamp));
+        
+        $daysOfWeek = [
+            'Senin'   => date('Y-m-d', strtotime($monday)),
+            'Selasa'  => date('Y-m-d', strtotime('+1 day', strtotime($monday))),
+            'Rabu'    => date('Y-m-d', strtotime('+2 days', strtotime($monday))),
+            'Kamis'   => date('Y-m-d', strtotime('+3 days', strtotime($monday))),
+            'Jumat'   => date('Y-m-d', strtotime('+4 days', strtotime($monday))),
+            'Sabtu'   => date('Y-m-d', strtotime('+5 days', strtotime($monday))),
+        ];
+
+        $students = Mahasiswa::query()
+            ->where('kelas_id', $selectedKelasId)
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        $studentIds = $students->pluck('id');
+        $weeklyAbsensi = [];
+        $weeklyTotals = [];
+        $monthlyTotals = [];
+
+        if ($students->isNotEmpty()) {
+            $weeklyRecords = Absensi::query()
+                ->whereIn('mahasiswa_id', $studentIds)
+                ->whereBetween('tanggal', [$monday, $saturday])
+                ->get();
+
+            foreach ($weeklyRecords as $rec) {
+                $dateKey = $rec->tanggal->format('Y-m-d');
+                $weeklyAbsensi[$rec->mahasiswa_id][$dateKey][$rec->jam_pelajaran_ke] = $rec->status;
+                if (in_array($rec->status, ['S', 'I', 'A'])) {
+                    $weeklyTotals[$rec->mahasiswa_id][$rec->status] = ($weeklyTotals[$rec->mahasiswa_id][$rec->status] ?? 0) + 1;
+                }
+            }
+
+            $monthlyRecords = Absensi::query()
+                ->whereIn('mahasiswa_id', $studentIds)
+                ->whereMonth('tanggal', $bulan)
+                ->whereYear('tanggal', $tahun)
+                ->get();
+
+            foreach ($monthlyRecords as $rec) {
+                if (in_array($rec->status, ['S', 'I', 'A'])) {
+                    $monthlyTotals[$rec->mahasiswa_id][$rec->status] = ($monthlyTotals[$rec->mahasiswa_id][$rec->status] ?? 0) + 1;
+                }
+            }
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.laporan.rekap_pdf', compact(
+            'selectedKelas', 'bulan', 'tahun', 'monthsList', 'students',
+            'weeklyAbsensi', 'weeklyTotals', 'monthlyTotals', 'daysOfWeek', 'rekapTab'
+        ))->setPaper('a4', 'landscape');
+
+        $namaKelasClean = str_replace(['/', '\\', ' '], '_', $selectedKelas->nama_kelas ?? 'Kelas');
+        $filename = 'Rekap_Presensi_' . $rekapTab . '_' . $namaKelasClean . '_' . $monthsList[$bulan] . '_' . $tahun . '.pdf';
+        
+        if ($request->has('download')) {
+            return $pdf->download($filename);
+        }
+
+        return $pdf->stream($filename);
+    }
+
     public function updateAbsensiStatus(Request $request)
     {
         $request->validate([
@@ -1237,10 +1376,131 @@ class AdminController extends Controller
         return redirect()->route('admin.settings')->with('success', 'Pengaturan sistem EduAttend IoT berhasil diperbarui.');
     }
 
-    // --- MANAJEMEN PERANGKAT IOT HARDWARE ---
+    // --- MANAJEMEN PERANGKAT IOT HARDWARE CRUD ---
     public function indexPerangkat()
     {
-        return view('admin.perangkat');
+        if (\App\Models\Perangkat::count() === 0) {
+            \App\Models\Perangkat::create([
+                'kode' => 'RASPBERRY-PI3-RFID',
+                'nama' => 'Raspberry Pi 3 - RFID Reader',
+                'sn' => 'RPI3-2026-RFID-01',
+                'tipe' => 'RC522 RFID Reader',
+                'lokasi' => 'Stasiun Sensor Alat (Lab IoT TI)',
+                'ip_address' => '192.168.1.23',
+                'mac_address' => 'B8:27:EB:41:89:A2',
+                'icon' => 'fa-id-card'
+            ]);
+            \App\Models\Perangkat::create([
+                'kode' => 'RASPBERRY-PI3-CAM',
+                'nama' => 'Raspberry Pi 3 - Camera Module',
+                'sn' => 'RPI3-2026-CAM-01',
+                'tipe' => 'Pi Camera Biometrik Wajah',
+                'lokasi' => 'Stasiun Sensor Alat (Lab IoT TI)',
+                'ip_address' => '192.168.1.23',
+                'mac_address' => 'B8:27:EB:41:89:A2',
+                'icon' => 'fa-camera'
+            ]);
+        }
+
+        $checkOnline = function($ip, $port = 80, $timeout = 1) {
+            $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+            if ($fp) {
+                fclose($fp);
+                return true;
+            }
+            $isWin = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+            $cmd = $isWin
+                ? "ping -n 1 -w 300 " . escapeshellarg($ip)
+                : "ping -c 1 -W 1 " . escapeshellarg($ip);
+            @exec($cmd, $output, $status);
+            return $status === 0;
+        };
+
+        $perangkats = \App\Models\Perangkat::all();
+        
+        $perangkatList = $perangkats->map(function($p) use ($checkOnline) {
+            $isOnline = $checkOnline($p->ip_address, 80, 1);
+            $p->is_online = $isOnline;
+            $p->status = $isOnline ? 'Online' : 'Offline';
+            return $p;
+        });
+
+        $totalPerangkat = $perangkatList->count();
+        $totalOnline = $perangkatList->filter(fn($p) => $p->is_online)->count();
+        $totalOffline = $totalPerangkat - $totalOnline;
+
+        return view('admin.perangkat', compact('perangkatList', 'totalPerangkat', 'totalOnline', 'totalOffline'));
+    }
+
+    public function storePerangkat(Request $request)
+    {
+        $request->validate([
+            'kode' => 'required|string|max:50|unique:perangkats,kode',
+            'nama' => 'required|string|max:100',
+            'tipe' => 'required|string|max:100',
+            'lokasi' => 'required|string|max:100',
+            'ip_address' => 'required|string|max:50',
+            'sn' => 'nullable|string|max:50',
+            'mac_address' => 'nullable|string|max:50',
+            'icon' => 'nullable|string|max:50',
+        ]);
+
+        \App\Models\Perangkat::create($request->all());
+
+        return redirect()->route('admin.perangkat.index')->with('success', 'Perangkat IoT Hardware berhasil ditambahkan.');
+    }
+
+    public function updatePerangkat(Request $request, $id)
+    {
+        $perangkat = \App\Models\Perangkat::findOrFail($id);
+
+        $request->validate([
+            'kode' => 'required|string|max:50|unique:perangkats,kode,' . $id,
+            'nama' => 'required|string|max:100',
+            'tipe' => 'required|string|max:100',
+            'lokasi' => 'required|string|max:100',
+            'ip_address' => 'required|string|max:50',
+            'sn' => 'nullable|string|max:50',
+            'mac_address' => 'nullable|string|max:50',
+            'icon' => 'nullable|string|max:50',
+        ]);
+
+        $perangkat->update($request->all());
+
+        return redirect()->route('admin.perangkat.index')->with('success', 'Data Perangkat IoT berhasil diperbarui.');
+    }
+
+    public function destroyPerangkat($id)
+    {
+        $perangkat = \App\Models\Perangkat::findOrFail($id);
+        $perangkat->delete();
+
+        return redirect()->route('admin.perangkat.index')->with('success', 'Perangkat IoT Hardware berhasil dihapus.');
+    }
+
+    public function pingPerangkat($id)
+    {
+        $perangkat = \App\Models\Perangkat::findOrFail($id);
+
+        $fp = @fsockopen($perangkat->ip_address, 80, $errno, $errstr, 1);
+        $isOnline = false;
+        if ($fp) {
+            fclose($fp);
+            $isOnline = true;
+        } else {
+            $isWin = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+            $cmd = $isWin
+                ? "ping -n 1 -w 500 " . escapeshellarg($perangkat->ip_address)
+                : "ping -c 1 -W 1 " . escapeshellarg($perangkat->ip_address);
+            @exec($cmd, $output, $status);
+            $isOnline = ($status === 0);
+        }
+
+        if ($isOnline) {
+            return redirect()->route('admin.perangkat.index')->with('success', "Tes Ping Berhasil! Perangkat {$perangkat->nama} ({$perangkat->ip_address}) Terhubung & ONLINE 🟢");
+        } else {
+            return redirect()->route('admin.perangkat.index')->with('error', "Tes Ping Gagal! Perangkat {$perangkat->nama} ({$perangkat->ip_address}) OFFLINE 🔴. Periksa IP Address & Koneksi Alat.");
+        }
     }
 
     // --- MANAJEMEN PERMOHONAN GANTI FOTO MAHASISWA ---
