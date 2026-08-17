@@ -85,8 +85,34 @@ class IotController extends Controller
         return 'A'; // Alpa langsung
     }
 
+    public function heartbeat(Request $request)
+    {
+        $kode = $request->input('kode_perangkat', $request->input('kode'));
+
+        if ($kode) {
+            $perangkat = \App\Models\Perangkat::where('kode', trim($kode))->first();
+            if ($perangkat) {
+                $perangkat->update(['last_seen_at' => now()]);
+            } else {
+                \App\Models\Perangkat::query()->update(['last_seen_at' => now()]);
+            }
+        } else {
+            \App\Models\Perangkat::query()->update(['last_seen_at' => now()]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Heartbeat IoT diterima & dicatat.',
+            'status' => 'Online',
+            'timestamp' => now()->toIso8601String()
+        ]);
+    }
+
     public function verify(Request $request)
     {
+        // Touch device last_seen_at timestamp
+        \App\Models\Perangkat::query()->update(['last_seen_at' => now()]);
+
         $request->validate([
             'rfid_uid' => 'required|string',
         ]);

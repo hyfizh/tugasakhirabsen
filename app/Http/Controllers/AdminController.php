@@ -43,9 +43,16 @@ class AdminController extends Controller
             ->take(5)
             ->get();
 
-        // Dynamic Network Reachability Check for IoT Devices
-        $checkOnline = function($ip, $port = 80, $timeout = 1) {
-            $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+        // Dynamic Network Reachability & Last Seen Check for IoT Devices
+        $checkOnline = function($perangkat) {
+            // 1. Check Cloud Heartbeat / Last Seen timestamp (< 60s)
+            if ($perangkat->last_seen_at && $perangkat->last_seen_at->gt(now()->subSeconds(60))) {
+                return true;
+            }
+            // 2. Fallback to LAN Direct Socket / ICMP Ping
+            $ip = $perangkat->ip_address;
+            if (!$ip) return false;
+            $fp = @fsockopen($ip, 80, $errno, $errstr, 1);
             if ($fp) {
                 fclose($fp);
                 return true;
@@ -84,7 +91,7 @@ class AdminController extends Controller
         }
 
         $iotDevices = $perangkats->map(function($p) use ($checkOnline) {
-            $isOnline = $checkOnline($p->ip_address, 80, 1);
+            $isOnline = $checkOnline($p);
             $p->is_online = $isOnline;
             $p->status = $isOnline ? 'Online' : 'Offline';
             $p->ip = $p->ip_address;
@@ -1402,8 +1409,13 @@ class AdminController extends Controller
             ]);
         }
 
-        $checkOnline = function($ip, $port = 80, $timeout = 1) {
-            $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+        $checkOnline = function($perangkat) {
+            if ($perangkat->last_seen_at && $perangkat->last_seen_at->gt(now()->subSeconds(60))) {
+                return true;
+            }
+            $ip = $perangkat->ip_address;
+            if (!$ip) return false;
+            $fp = @fsockopen($ip, 80, $errno, $errstr, 1);
             if ($fp) {
                 fclose($fp);
                 return true;
@@ -1419,7 +1431,7 @@ class AdminController extends Controller
         $perangkats = \App\Models\Perangkat::all();
         
         $perangkatList = $perangkats->map(function($p) use ($checkOnline) {
-            $isOnline = $checkOnline($p->ip_address, 80, 1);
+            $isOnline = $checkOnline($p);
             $p->is_online = $isOnline;
             $p->status = $isOnline ? 'Online' : 'Offline';
             return $p;

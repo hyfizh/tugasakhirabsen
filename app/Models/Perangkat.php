@@ -18,5 +18,10 @@ class Perangkat extends Model
         'ip_address',
         'mac_address',
         'icon',
+        'last_seen_at',
+    ];
+
+    protected $casts = [
+        'last_seen_at' => 'datetime',
     ];
 }
