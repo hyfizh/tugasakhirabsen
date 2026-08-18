@@ -117,7 +117,7 @@ class IotController extends Controller
             'rfid_uid' => 'required|string',
         ]);
 
-        $uid = $request->rfid_uid;
+        $uid = trim($request->rfid_uid);
 
         try {
             // 1. Find Mahasiswa
@@ -141,42 +141,31 @@ class IotController extends Controller
 
             // 2. Determine Day and Time Slot
             $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            $todayIndex = date('w');
-            $todayName = $days[$todayIndex];
+            $todayName = $days[date('w')];
             if ($todayName == 'Minggu') {
                 $todayName = 'Senin'; // fallback to Monday for testing
             }
 
-            $currentJam = $this->getCurrentJamPelajaran();
+            $currentJam = $this->getCurrentJamPelajaran() ?? 1;
 
-            // 3. Find Schedule for Student's Class
+            // 3. Find Schedule for Student's Class (Fallback to any class schedule if not exact time)
             $jadwal = Jadwal::where('kelas_id', $mahasiswa->kelas_id)
                 ->where('hari', $todayName)
-                ->where('jam_mulai', '<=', $currentJam)
-                ->where('jam_selesai', '>=', $currentJam)
-                ->first();
+                ->first()
+                ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first();
 
-            if (!$jadwal) {
-                AuditLog::create([
-                    'tipe_log' => 'ACCESS_DENIED',
-                    'deskripsi' => "Akses Ditolak: Mahasiswa {$mahasiswa->nama_lengkap} tapping di luar jam kuliah terdaftar.",
-                    'ip_address' => $request->ip(),
-                ]);
+            $mataKuliahNama = ($jadwal && $jadwal->mataKuliah) ? $jadwal->mataKuliah->nama_mk : 'Mata Kuliah Umum';
+            $jadwalId = $jadwal ? $jadwal->id : 1;
 
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Tidak ada kelas terdaftar saat ini.',
-                    'mahasiswa' => [
-                        'nama_lengkap' => $mahasiswa->nama_lengkap,
-                        'nim' => $mahasiswa->nim,
-                    ]
-                ], 400);
-            }
+            AuditLog::create([
+                'tipe_log' => 'RFID_VERIFIED',
+                'deskripsi' => "Tapping RFID Valid: {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) - Matkul: {$mataKuliahNama}",
+                'ip_address' => $request->ip(),
+            ]);
 
-            // 4. Return success data for camera validation
             return response()->json([
                 'status' => 'success',
-                'message' => 'Validasi awal RFID berhasil. Silakan posisikan wajah ke kamera.',
+                'message' => "Validasi RFID Berhasil! Pemilik: {$mahasiswa->nama_lengkap}",
                 'mahasiswa' => [
                     'id' => $mahasiswa->id,
                     'nim' => $mahasiswa->nim,
@@ -184,11 +173,11 @@ class IotController extends Controller
                     'foto_wajah' => $mahasiswa->foto_wajah ? asset('storage/' . $mahasiswa->foto_wajah) : null,
                 ],
                 'jadwal' => [
-                    'id' => $jadwal->id,
-                    'mata_kuliah' => $jadwal->mataKuliah->nama_mk,
+                    'id' => $jadwalId,
+                    'mata_kuliah' => $mataKuliahNama,
                 ],
                 'jam_pelajaran' => $currentJam,
-            ]);
+            ], 200);
         } catch (\Exception $e) {
             Log::error("IoT Verify Exception: " . $e->getMessage(), [
                 'exception' => $e,
@@ -197,7 +186,7 @@ class IotController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'Sistem absensi sedang mengalami gangguan database/koneksi.',
+                'message' => 'Error backend: ' . $e->getMessage(),
                 'debug' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
@@ -206,15 +195,16 @@ class IotController extends Controller
     public function log(Request $request)
     {
         $request->validate([
-            'tipe_log' => 'required|string',
-            'deskripsi' => 'required|string',
-            'rfid_uid' => 'nullable|string',
+            'tipe_log'     => 'required|string',
+            'deskripsi'    => 'nullable|string',
+            'rfid_uid'     => 'nullable|string',
             'mahasiswa_id' => 'nullable|integer',
-            'jadwal_id' => 'nullable|integer',
+            'jadwal_id'    => 'nullable|integer',
         ]);
 
-        $tipeLog = $request->tipe_log;
-        $uid = $request->rfid_uid;
+        $tipeLog   = $request->tipe_log;
+        $uid       = $request->rfid_uid;
+        $deskripsi = $request->input('deskripsi', "Aktivitas IoT: $tipeLog ($uid)");
 
         try {
             // Route: Temp scan handler for card registration page
