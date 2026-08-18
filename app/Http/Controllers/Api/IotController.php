@@ -66,11 +66,8 @@ class IotController extends Controller
             return 'H'; // Hadir Tepat Waktu (H)
         }
 
-        if ($time > $windowEnd) {
-            return 'T'; // Terlambat (T)
-        }
-
-        return 'H';
+        // STRICT POLICY: Tidak ada status Terlambat (T). Jika tap lewat > 15m -> DENIED (Akses Ditolak)
+        return 'DENIED';
     }
 
     public function heartbeat(Request $request)
@@ -168,9 +165,26 @@ class IotController extends Controller
             $jadwalId       = $jadwal ? $jadwal->id : 1;
             
             $statusPresensiCode  = $this->calculateAttendanceStatus($currentJam, $jadwal);
-            $statusPresensiLabel = ($statusPresensiCode === 'H') 
-                ? 'HADIR TEPAT WAKTU (H) 🟢' 
-                : 'TERLAMBAT (T) 🟡 (LEWAT DARI JADWAL MATKUL > 15 MIN)';
+
+            if ($statusPresensiCode === 'DENIED') {
+                AuditLog::create([
+                    'tipe_log' => 'ACCESS_DENIED',
+                    'deskripsi' => "Akses Ditolak: Mahasiswa {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) mencoba tap di luar jendela toleransi presensi (Terlambat > 15 Menit).",
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'status' => 'time_expired',
+                    'message' => "Presensi Ditolak! Mahasiswa {$mahasiswa->nama_lengkap} tap di luar batas toleransi (Terlambat > 15 Menit).",
+                    'mahasiswa' => [
+                        'id'           => $mahasiswa->id,
+                        'nim'          => $mahasiswa->nim,
+                        'nama_lengkap' => $mahasiswa->nama_lengkap,
+                    ]
+                ], 200);
+            }
+
+            $statusPresensiLabel = 'HADIR TEPAT WAKTU (H) 🟢';
 
             AuditLog::create([
                 'tipe_log' => 'RFID_VERIFIED',

@@ -114,6 +114,7 @@ Route::middleware(['auth', 'role:mahasiswa'])->prefix('mahasiswa')->group(functi
     Route::middleware(['force_change_password'])->group(function () {
         Route::get('/dashboard', [MahasiswaController::class, 'dashboard'])->name('mahasiswa.dashboard');
         Route::get('/profile', [MahasiswaController::class, 'showProfileForm'])->name('mahasiswa.profile.form');
+        Route::get('/face', [MahasiswaController::class, 'showProfileForm'])->name('mahasiswa.face.form');
         Route::put('/profile', [MahasiswaController::class, 'updateProfile'])->name('mahasiswa.profile.update');
         Route::get('/riwayat', [MahasiswaController::class, 'riwayatAbsen'])->name('mahasiswa.riwayat');
 
