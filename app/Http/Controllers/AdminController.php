@@ -927,7 +927,7 @@ class AdminController extends Controller
 
         $dateStr = sprintf('%04d-%02d-01', $tahun, $bulan);
 
-        // Determine Week Number (Minggu ke-1 s/d Minggu ke-5)
+        // Determine Week Number (Minggu ke-1 s/d Minggu ke-4)
         $currentMonth = (int) date('m');
         $currentYear  = (int) date('Y');
         
@@ -936,22 +936,19 @@ class AdminController extends Controller
         } else {
             if ($bulan === $currentMonth && $tahun === $currentYear) {
                 $dayOfMonth = (int) date('j');
-                $minggu = (int) ceil($dayOfMonth / 7);
-                if ($minggu > 4) $minggu = 4;
+                if ($dayOfMonth <= 7) $minggu = 1;
+                elseif ($dayOfMonth <= 14) $minggu = 2;
+                elseif ($dayOfMonth <= 21) $minggu = 3;
+                else $minggu = 4;
             } else {
                 $minggu = 1;
             }
         }
 
-        if (!$request->has('minggu') && $bulan === $currentMonth && $tahun === $currentYear) {
-            $monday = date('Y-m-d', strtotime('monday this week'));
-        } else {
-            $firstDayOfMonth = sprintf('%04d-%02d-01', $tahun, $bulan);
-            $startOffset = ($minggu - 1) * 7;
-            $targetDay = date('Y-m-d', strtotime("+$startOffset days", strtotime($firstDayOfMonth)));
-            $monday = date('Y-m-d', strtotime('monday this week', strtotime($targetDay)));
-        }
-        
+        // Calculate Monday for Week 1, 2, 3, or 4 of the month
+        $midWeekDay = ($minggu - 1) * 7 + 4; // Day 4, 11, 18, 25 of the month
+        $targetDate = sprintf('%04d-%02d-%02d', $tahun, $bulan, $midWeekDay);
+        $monday = date('Y-m-d', strtotime('monday this week', strtotime($targetDate)));
         $saturday = date('Y-m-d', strtotime('+5 days', strtotime($monday)));
         
         $daysOfWeek = [
