@@ -303,12 +303,32 @@ class IotController extends Controller
 
                 $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
                 $todayName = $days[date('w')];
+                if ($todayName == 'Minggu') {
+                    $todayName = 'Senin';
+                }
                 $currentJam = $this->getCurrentJamPelajaran() ?? 1;
 
                 $jadwal = $request->jadwal_id 
                     ? Jadwal::find($request->jadwal_id) 
                     : (Jadwal::where('kelas_id', $mahasiswa->kelas_id)->where('hari', $todayName)->first() 
                        ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first());
+
+                if (!$jadwal) {
+                    $firstMk = \App\Models\MataKuliah::first();
+                    $jadwal = Jadwal::firstOrCreate(
+                        [
+                            'kelas_id' => $mahasiswa->kelas_id,
+                            'hari'     => $todayName,
+                        ],
+                        [
+                            'mata_kuliah_id' => $firstMk ? $firstMk->id : 1,
+                            'dosen_id'       => 1,
+                            'jam_mulai'      => 1,
+                            'jam_selesai'    => 2,
+                            'ruangan'        => 'Lab IoT',
+                        ]
+                    );
+                }
 
                 $jadwalId = $jadwal ? $jadwal->id : 1;
 
