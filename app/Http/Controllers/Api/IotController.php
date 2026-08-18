@@ -155,11 +155,16 @@ class IotController extends Controller
                 ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first();
 
             $mataKuliahNama = ($jadwal && $jadwal->mataKuliah) ? $jadwal->mataKuliah->nama_mk : 'Mata Kuliah Umum';
-            $jadwalId = $jadwal ? $jadwal->id : 1;
+            $ruanganNama    = ($jadwal && $jadwal->ruangan) ? $jadwal->ruangan : 'Lab IoT';
+            $kelasNama      = ($mahasiswa->kelas) ? $mahasiswa->kelas->nama_kelas : 'TI-3A';
+            $jadwalId       = $jadwal ? $jadwal->id : 1;
+            
+            $statusPresensiCode  = $this->calculateAttendanceStatus($currentJam);
+            $statusPresensiLabel = ($statusPresensiCode === 'H') ? 'HADIR TEPAT WAKTU (H) 🟢' : 'TERLAMBAT (T) 🟡';
 
             AuditLog::create([
                 'tipe_log' => 'RFID_VERIFIED',
-                'deskripsi' => "Tapping RFID Valid: {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) - Matkul: {$mataKuliahNama}",
+                'deskripsi' => "Tapping RFID Valid: {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) - Kelas: {$kelasNama} - Matkul: {$mataKuliahNama}",
                 'ip_address' => $request->ip(),
             ]);
 
@@ -167,16 +172,20 @@ class IotController extends Controller
                 'status' => 'success',
                 'message' => "Validasi RFID Berhasil! Pemilik: {$mahasiswa->nama_lengkap}",
                 'mahasiswa' => [
-                    'id' => $mahasiswa->id,
-                    'nim' => $mahasiswa->nim,
+                    'id'           => $mahasiswa->id,
+                    'nim'          => $mahasiswa->nim,
                     'nama_lengkap' => $mahasiswa->nama_lengkap,
-                    'foto_wajah' => $mahasiswa->foto_wajah ? asset('storage/' . $mahasiswa->foto_wajah) : null,
+                    'kelas'        => $kelasNama,
+                    'foto_wajah'   => $mahasiswa->foto_wajah ? asset('storage/' . $mahasiswa->foto_wajah) : null,
                 ],
                 'jadwal' => [
-                    'id' => $jadwalId,
+                    'id'          => $jadwalId,
                     'mata_kuliah' => $mataKuliahNama,
+                    'ruangan'     => $ruanganNama,
                 ],
-                'jam_pelajaran' => $currentJam,
+                'jam_pelajaran'         => $currentJam,
+                'status_presensi'       => $statusPresensiCode,
+                'status_presensi_label' => $statusPresensiLabel,
             ], 200);
         } catch (\Exception $e) {
             Log::error("IoT Verify Exception: " . $e->getMessage(), [
