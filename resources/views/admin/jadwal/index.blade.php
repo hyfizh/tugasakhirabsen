@@ -292,6 +292,20 @@
                         </select>
                     </div>
 
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="ruangan" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Ruangan / Lab</label>
+                            <input type="text" name="ruangan" id="ruangan" placeholder="Contoh: Lab IoT / Ruang 301" value="Lab IoT"
+                                   class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
+                        </div>
+
+                        <div>
+                            <label for="toleransi_keterlambatan" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Toleransi (Menit)</label>
+                            <input type="number" name="toleransi_keterlambatan" id="toleransi_keterlambatan" placeholder="30" value="30" min="0" max="60"
+                                   class="mt-1.5 block w-full rounded-xl border border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-xs text-slate-800 p-3">
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label for="hari" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Hari</label>

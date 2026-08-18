@@ -493,34 +493,77 @@ class AdminController extends Controller
 
     public function storeJadwal(Request $request)
     {
-        $request->validate([
-            'kelas_id' => 'required|exists:kelas,id',
-            'mata_kuliah_id' => 'required|exists:mata_kuliahs,id',
-            'dosen_id' => 'required|exists:dosens,id',
-            'hari' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu',
-            'jam_mulai' => 'required|integer|min:1|max:10',
-            'jam_selesai' => 'required|integer|min:1|max:10|gte:jam_mulai',
-            'toleransi_keterlambatan' => 'required|integer|min:0|max:60',
+        $validated = $request->validate([
+            'kelas_id'                => 'required|exists:kelas,id',
+            'mata_kuliah_id'          => 'required|exists:mata_kuliahs,id',
+            'dosen_id'               => 'required|exists:dosens,id',
+            'hari'                   => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu',
+            'jam_mulai'              => 'required|integer|min:1|max:10',
+            'jam_selesai'            => 'required|integer|min:1|max:10|gte:jam_mulai',
+            'ruangan'                => 'nullable|string|max:100',
+            'toleransi_keterlambatan' => 'nullable|integer|min:0|max:60',
         ]);
 
-        Jadwal::query()->create($request->all());
-        return redirect()->route('admin.jadwal.index')->with('success', 'Jadwal berhasil ditambahkan.');
+        $validated['ruangan'] = $request->input('ruangan', 'Lab IoT');
+        $validated['toleransi_keterlambatan'] = $request->input('toleransi_keterlambatan', 30);
+
+        // Cek Bentrok Jadwal Kelas
+        $conflict = Jadwal::where('kelas_id', $validated['kelas_id'])
+            ->where('hari', $validated['hari'])
+            ->where(function($q) use ($validated) {
+                $q->whereBetween('jam_mulai', [$validated['jam_mulai'], $validated['jam_selesai']])
+                  ->orWhereBetween('jam_selesai', [$validated['jam_mulai'], $validated['jam_selesai']])
+                  ->orWhere(function($sub) use ($validated) {
+                      $sub->where('jam_mulai', '<=', $validated['jam_mulai'])
+                          ->where('jam_selesai', '>=', $validated['jam_selesai']);
+                  });
+            })
+            ->exists();
+
+        if ($conflict) {
+            return redirect()->back()->withInput()->with('error', "Jadwal bentrok! Kelas tersebut sudah memiliki jadwal perkuliahan pada hari {$validated['hari']} Jam ke-{$validated['jam_mulai']} s/d {$validated['jam_selesai']}.");
+        }
+
+        Jadwal::query()->create($validated);
+        return redirect()->route('admin.jadwal.index', ['kelas_id' => $validated['kelas_id']])->with('success', 'Jadwal perkuliahan baru berhasil dibuat!');
     }
 
     public function updateJadwal(Request $request, Jadwal $jadwal)
     {
-        $request->validate([
-            'kelas_id' => 'required|exists:kelas,id',
-            'mata_kuliah_id' => 'required|exists:mata_kuliahs,id',
-            'dosen_id' => 'required|exists:dosens,id',
-            'hari' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu',
-            'jam_mulai' => 'required|integer|min:1|max:10',
-            'jam_selesai' => 'required|integer|min:1|max:10|gte:jam_mulai',
-            'toleransi_keterlambatan' => 'required|integer|min:0|max:60',
+        $validated = $request->validate([
+            'kelas_id'                => 'required|exists:kelas,id',
+            'mata_kuliah_id'          => 'required|exists:mata_kuliahs,id',
+            'dosen_id'               => 'required|exists:dosens,id',
+            'hari'                   => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu',
+            'jam_mulai'              => 'required|integer|min:1|max:10',
+            'jam_selesai'            => 'required|integer|min:1|max:10|gte:jam_mulai',
+            'ruangan'                => 'nullable|string|max:100',
+            'toleransi_keterlambatan' => 'nullable|integer|min:0|max:60',
         ]);
 
-        $jadwal->update($request->all());
-        return redirect()->route('admin.jadwal.index')->with('success', 'Jadwal berhasil diperbarui.');
+        $validated['ruangan'] = $request->input('ruangan', 'Lab IoT');
+        $validated['toleransi_keterlambatan'] = $request->input('toleransi_keterlambatan', 30);
+
+        // Cek Bentrok Jadwal Kelas (abaikan jadwal yang sedang diedit)
+        $conflict = Jadwal::where('kelas_id', $validated['kelas_id'])
+            ->where('hari', $validated['hari'])
+            ->where('id', '!=', $jadwal->id)
+            ->where(function($q) use ($validated) {
+                $q->whereBetween('jam_mulai', [$validated['jam_mulai'], $validated['jam_selesai']])
+                  ->orWhereBetween('jam_selesai', [$validated['jam_mulai'], $validated['jam_selesai']])
+                  ->orWhere(function($sub) use ($validated) {
+                      $sub->where('jam_mulai', '<=', $validated['jam_mulai'])
+                          ->where('jam_selesai', '>=', $validated['jam_selesai']);
+                  });
+            })
+            ->exists();
+
+        if ($conflict) {
+            return redirect()->back()->withInput()->with('error', "Jadwal bentrok! Kelas tersebut sudah memiliki jadwal perkuliahan pada hari {$validated['hari']} Jam ke-{$validated['jam_mulai']} s/d {$validated['jam_selesai']}.");
+        }
+
+        $jadwal->update($validated);
+        return redirect()->route('admin.jadwal.index', ['kelas_id' => $validated['kelas_id']])->with('success', 'Jadwal perkuliahan berhasil diperbarui!');
     }
 
     public function destroyJadwal(Jadwal $jadwal)
