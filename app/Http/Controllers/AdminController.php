@@ -1160,56 +1160,6 @@ class AdminController extends Controller
         return $pdf->stream($filename);
     }
 
-    public function updateAbsensiStatus(Request $request)
-    {
-        $request->validate([
-            'mahasiswa_id' => 'required|exists:mahasiswas,id',
-            'jadwal_id'    => 'nullable|exists:jadwals,id',
-            'tanggal'      => 'required|date',
-            'status'       => 'required|in:H,T,I,S,A',
-            'keterangan'   => 'nullable|string|max:255',
-        ]);
-
-        $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
-        $jadwalId = $request->jadwal_id;
-
-        if (!$jadwalId) {
-            $jadwalId = Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first()?->id;
-        }
-
-        $absensi = Absensi::updateOrCreate(
-            [
-                'mahasiswa_id' => $mahasiswa->id,
-                'tanggal'      => $request->tanggal,
-                'jadwal_id'    => $jadwalId,
-            ],
-            [
-                'jam_pelajaran_ke'       => 1,
-                'status'                 => $request->status,
-                'waktu_tap_rfid'         => now(),
-                'waktu_verifikasi_wajah' => now(),
-            ]
-        );
-
-        $statusNames = [
-            'H' => 'Hadir Tepat Waktu',
-            'T' => 'Terlambat',
-            'I' => 'Izin',
-            'S' => 'Sakit',
-            'A' => 'Alpa',
-        ];
-
-        $statusText = $statusNames[$request->status] ?? $request->status;
-
-        AuditLog::create([
-            'tipe_log'   => 'ABSENSI_UPDATED',
-            'deskripsi'  => "Admin merubah status absensi {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) tanggal {$request->tanggal} menjadi '{$statusText}'" . ($request->keterangan ? " (Surat/Keterangan: {$request->keterangan})" : ''),
-            'ip_address' => $request->ip(),
-        ]);
-
-        return redirect()->back()->with('success', "Status absensi {$mahasiswa->nama_lengkap} berhasil diubah menjadi {$statusText}.");
-    }
-
     // --- CETAK SURAT PERINGATAN II & III ---
     public function cetakSp(Request $request, Mahasiswa $mahasiswa)
     {
