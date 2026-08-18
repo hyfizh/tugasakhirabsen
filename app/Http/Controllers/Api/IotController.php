@@ -238,8 +238,31 @@ class IotController extends Controller
                 ]);
             }
 
-            // Route: Log access granted / verification results
-            if ($tipeLog === 'ACCESS_GRANTED') {
+            // Route: Log access denied / face verification failed
+            $wajahValid = $request->boolean('wajah_valid', true);
+
+            if ($tipeLog === 'ACCESS_DENIED' || !$wajahValid) {
+                $uid = $request->rfid_uid;
+                $mahasiswa = $request->mahasiswa_id 
+                    ? Mahasiswa::find($request->mahasiswa_id) 
+                    : ($uid ? Mahasiswa::where('rfid_uid', $uid)->first() : null);
+
+                $namaMhs = $mahasiswa ? "{$mahasiswa->nama_lengkap} ({$mahasiswa->nim})" : "UID: $uid";
+
+                AuditLog::create([
+                    'tipe_log' => 'ACCESS_DENIED',
+                    'deskripsi' => "Akses Ditolak & Presensi Gagal: Verifikasi Biometrik Wajah TIDAK COCOK dengan $namaMhs.",
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'status' => 'denied',
+                    'message' => 'Presensi Ditolak! Wajah di depan kamera TIDAK COCOK dengan foto profil terdaftar.',
+                ], 403);
+            }
+
+            // Route: Log access granted / verification results (ONLY IF WAJAH VALID)
+            if ($tipeLog === 'ACCESS_GRANTED' && $wajahValid) {
                 $uid = $request->rfid_uid;
                 $mahasiswa = $request->mahasiswa_id 
                     ? Mahasiswa::find($request->mahasiswa_id) 
