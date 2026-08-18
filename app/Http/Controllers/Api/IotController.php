@@ -334,19 +334,29 @@ class IotController extends Controller
 
                 $calculatedStatus = $this->calculateAttendanceStatus($currentJam);
 
-                $absensi = Absensi::updateOrCreate(
-                    [
-                        'mahasiswa_id' => $mahasiswa->id,
-                        'jadwal_id'    => $jadwalId,
-                        'tanggal'      => date('Y-m-d'),
-                    ],
-                    [
-                        'jam_pelajaran_ke'       => $currentJam,
-                        'status'                 => $calculatedStatus,
-                        'waktu_tap_rfid'         => date('Y-m-d H:i:s'),
-                        'waktu_verifikasi_wajah' => date('Y-m-d H:i:s'),
-                    ]
-                );
+                $jamStart = $jadwal ? (int)$jadwal->jam_mulai : (int)$currentJam;
+                $jamEnd   = $jadwal ? (int)$jadwal->jam_selesai : (int)$currentJam;
+                if ($jamEnd < $jamStart) {
+                    $jamEnd = $jamStart;
+                }
+
+                $lastAbsensi = null;
+                for ($j = $jamStart; $j <= $jamEnd; $j++) {
+                    $lastAbsensi = Absensi::updateOrCreate(
+                        [
+                            'mahasiswa_id'     => $mahasiswa->id,
+                            'jadwal_id'        => $jadwalId,
+                            'tanggal'          => date('Y-m-d'),
+                            'jam_pelajaran_ke' => $j,
+                        ],
+                        [
+                            'status'                 => $calculatedStatus,
+                            'waktu_tap_rfid'         => date('Y-m-d H:i:s'),
+                            'waktu_verifikasi_wajah' => date('Y-m-d H:i:s'),
+                        ]
+                    );
+                }
+                $absensi = $lastAbsensi;
 
                 // Kirim email notifikasi presensi berhasil jika email terverifikasi
                 $emailTarget = $mahasiswa->email ?? $mahasiswa->user?->email;
