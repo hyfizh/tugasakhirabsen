@@ -33,41 +33,43 @@ class EmailVerificationController extends Controller
         // Store OTP & Pending Email in Session (expires in 10 mins)
         session([
             'pending_email'  => $email,
-            'email_otp'      => $otp,
-            'otp_expires_at' => now()->addMinutes(10),
+            'email_otp'      => (string)$otp,
+            'otp_expires_at' => now()->addMinutes(10)->timestamp,
             'otp_sent'       => true,
         ]);
+        session()->save();
 
         try {
             Mail::to($email)->send(new OtpVerificationMail($otp));
             return redirect()->back()->with('success', "Kode OTP 6-digit telah dikirimkan ke $email. Silakan periksa Inbox/Spam.");
         } catch (\Exception $e) {
             Log::error("Failed sending OTP email: " . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal mengirim email. Silakan periksa koneksi internet.');
+            return redirect()->back()->with('error', 'Gagal mengirim email OTP: ' . $e->getMessage());
         }
     }
 
     public function verifyOtp(Request $request)
     {
         $request->validate([
-            'otp' => 'required|digits:6',
+            'otp' => 'required',
         ]);
 
-        $inputOtp     = trim($request->otp);
-        $sessionOtp   = session('email_otp');
+        $inputOtp     = trim((string)$request->otp);
+        $sessionOtp   = (string)session('email_otp');
         $pendingEmail = session('pending_email');
         $expiresAt    = session('otp_expires_at');
 
-        if (!$sessionOtp || !$pendingEmail || !$expiresAt) {
-            return redirect()->back()->with('error', 'Sesi verifikasi OTP telah berakhir. Silakan minta kode OTP baru.');
+        if (!$sessionOtp || !$pendingEmail) {
+            return redirect()->back()->with('error', 'Sesi verifikasi OTP tidak ditemukan. Silakan tekan tombol Kirim Kode OTP terlebih dahulu.');
         }
 
-        if (now()->greaterThan($expiresAt)) {
+        if ($expiresAt && now()->timestamp > $expiresAt) {
             session()->forget(['email_otp', 'pending_email', 'otp_expires_at', 'otp_sent']);
+            session()->save();
             return redirect()->back()->with('error', 'Kode OTP telah kadaluarsa (lebih dari 10 menit). Silakan minta kode OTP baru.');
         }
 
-        if ((string)$inputOtp !== (string)$sessionOtp) {
+        if ($inputOtp !== $sessionOtp) {
             return redirect()->back()->with('error', 'Kode OTP 6-digit yang Anda masukkan salah. Silakan periksa kembali.');
         }
 
