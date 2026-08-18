@@ -144,20 +144,52 @@ class IotController extends Controller
                 ], 200);
             }
 
-            // 2. Determine Day and Time Slot
+            // 2. Determine Day and Time Slot using Carbon (Asia/Jakarta)
+            $now = \Carbon\Carbon::now('Asia/Jakarta');
+            $currentTime = $now->format('H:i');
+
             $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            $todayName = $days[date('w')];
+            $todayName = $days[$now->dayOfWeek];
             if ($todayName == 'Minggu') {
-                $todayName = 'Senin'; // fallback to Monday for testing
+                $todayName = 'Senin'; // fallback for testing
             }
 
             $currentJam = $this->getCurrentJamPelajaran() ?? 1;
 
-            // 3. Find Schedule for Student's Class (Fallback to any class schedule if not exact time)
+            // 3. Find Schedule for Student's Class
             $jadwal = Jadwal::where('kelas_id', $mahasiswa->kelas_id)
                 ->where('hari', $todayName)
                 ->first()
                 ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first();
+
+            $sessionEndTimes = [
+                1  => '08:20', 2  => '09:10', 3  => '10:00', 4  => '11:00', 5  => '11:50',
+                6  => '12:40', 7  => '14:20', 8  => '15:10', 9  => '16:00', 10 => '16:50',
+            ];
+
+            // Check if schedule for today has ALREADY EXPIRED (Current Time > Schedule End Time)
+            if ($jadwal) {
+                $jamEndIndex = (int) ($jadwal->jam_selesai ?? 4);
+                $endTime = $sessionEndTimes[$jamEndIndex] ?? '16:50';
+
+                if ($currentTime > $endTime) {
+                    AuditLog::create([
+                        'tipe_log'   => 'ACCESS_DENIED',
+                        'deskripsi'  => "Presensi Ditolak: Sesi perkuliahan hari ini ($todayName) sudah berakhir untuk {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}).",
+                        'ip_address' => $request->ip(),
+                    ]);
+
+                    return response()->json([
+                        'status'  => 'schedule_not_found',
+                        'message' => 'Sesi perkuliahan sudah berakhir',
+                        'mahasiswa' => [
+                            'id'           => $mahasiswa->id,
+                            'nim'          => $mahasiswa->nim,
+                            'nama_lengkap' => $mahasiswa->nama_lengkap,
+                        ]
+                    ], 200);
+                }
+            }
 
             $mataKuliahNama = ($jadwal && $jadwal->mataKuliah) ? $jadwal->mataKuliah->nama_mk : 'Mata Kuliah Umum';
             $ruanganNama    = ($jadwal && $jadwal->ruangan) ? $jadwal->ruangan : 'Lab IoT';
