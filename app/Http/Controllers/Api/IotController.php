@@ -66,23 +66,23 @@ class IotController extends Controller
         }
 
         $startTime = $sessionTimes[$jamPelajaran]['start'];
-        $endTime   = $sessionTimes[$jamPelajaran]['end'];
 
-        // 1. Window 15 Menit Awal (Dimulai 15 menit sebelum jam kelas sampai 15 menit setelah kelas mulai)
-        $earlyStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
-        $earlyEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
+        // Aturan Presensi:
+        // Window Hadir Tepat Waktu (H): 15 menit sebelum matkul dimulai s/d 15 menit sesudah matkul dimulai
+        // Contoh Matkul 07:30 -> Hadir (H) dari 07:15 s/d 07:45
+        $windowStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
+        $windowEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
 
-        // 2. Window 15 Menit Akhir (Dimulai 15 menit sebelum kelas selesai sampai 15 menit setelah kelas selesai)
-        $lateStart  = date('H:i', strtotime($endTime . ' - 15 minutes'));
-        $lateEnd    = date('H:i', strtotime($endTime . ' + 15 minutes'));
-
-        // Jika tap berada di Window 15 Menit Awal (07:15 - 07:45 untuk jam 07:30) ATAU Window 15 Menit Akhir
-        if (($time >= $earlyStart && $time <= $earlyEnd) || ($time >= $lateStart && $time <= $lateEnd)) {
-            return 'H'; // Hadir Tepat Waktu / Presensi Valid Sesi
+        if ($time >= $windowStart && $time <= $windowEnd) {
+            return 'H'; // Hadir (H)
         }
 
-        // Jika lewat dari 15 menit awal (misal lewat dari 07:45), langsung dicatat Alpa ('A')
-        return 'A'; // Alpa langsung
+        // Jika tap lewat dari 15 menit setelah matkul dimulai (> 07:45) -> Status Terlambat (T)
+        if ($time > $windowEnd) {
+            return 'T'; // Terlambat (T)
+        }
+
+        return 'H';
     }
 
     public function heartbeat(Request $request)
@@ -260,6 +260,8 @@ class IotController extends Controller
 
                 $jadwalId = $jadwal ? $jadwal->id : 1;
 
+                $calculatedStatus = $this->calculateAttendanceStatus($currentJam);
+
                 $absensi = Absensi::updateOrCreate(
                     [
                         'mahasiswa_id' => $mahasiswa->id,
@@ -268,7 +270,7 @@ class IotController extends Controller
                     ],
                     [
                         'jam_pelajaran_ke'       => $currentJam,
-                        'status'                 => 'H',
+                        'status'                 => $calculatedStatus,
                         'waktu_tap_rfid'         => date('Y-m-d H:i:s'),
                         'waktu_verifikasi_wajah' => date('Y-m-d H:i:s'),
                     ]

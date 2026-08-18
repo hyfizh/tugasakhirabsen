@@ -38,9 +38,8 @@ class AdminController extends Controller
 
         $recentLogs = AuditLog::query()->orderBy('created_at', 'desc')->take(4)->get();
         $todayAbsensiList = Absensi::query()->with(['mahasiswa.kelas', 'jadwal.mataKuliah'])
-            ->where('tanggal', $todayDate)
             ->orderBy('updated_at', 'desc')
-            ->take(5)
+            ->take(10)
             ->get();
 
         // Dynamic Network Reachability & Last Seen Check for IoT Devices
