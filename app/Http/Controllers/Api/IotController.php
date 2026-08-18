@@ -334,10 +334,15 @@ class IotController extends Controller
 
                 $calculatedStatus = $this->calculateAttendanceStatus($currentJam);
 
-                $jamStart = $jadwal ? (int)$jadwal->jam_mulai : (int)$currentJam;
-                $jamEnd   = $jadwal ? (int)$jadwal->jam_selesai : (int)$currentJam;
-                if ($jamEnd < $jamStart) {
-                    $jamEnd = $jamStart;
+                $jamStart = ($jadwal && $jadwal->jam_mulai) ? (int)$jadwal->jam_mulai : 1;
+                $jamEnd   = ($jadwal && $jadwal->jam_selesai) ? (int)$jadwal->jam_selesai : 4;
+
+                // Jika jam_selesai sama dengan atau lebih kecil dari jam_mulai, perluas ke blok 4 jam matkul (misal Jam 1-4)
+                if ($jamEnd <= $jamStart) {
+                    $jamEnd = $jamStart + 3;
+                }
+                if ($jamEnd > 10) {
+                    $jamEnd = 10;
                 }
 
                 $lastAbsensi = null;
