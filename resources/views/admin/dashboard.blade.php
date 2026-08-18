@@ -182,16 +182,28 @@
                                             </div>
                                         </td>
                                         <td class="py-3 px-2 text-slate-600 font-semibold">{{ $abs->mahasiswa->kelas->nama_kelas ?? 'CS-301' }}</td>
-                                        <td class="py-3 px-2 text-slate-600 font-mono">{{ substr($abs->jam_masuk ?? '07:45:12', 0, 8) }}</td>
+                                        <td class="py-3 px-2 text-slate-600 font-mono font-semibold">
+                                            {{ $abs->waktu_tap_rfid ? $abs->waktu_tap_rfid->format('H:i:s') : ($abs->created_at ? $abs->created_at->format('H:i:s') : date('H:i:s')) }}
+                                        </td>
                                         <td class="py-3 px-2">
                                             <span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-semibold border border-slate-200/60 inline-flex items-center">
                                                 <i class="fa-solid fa-barcode text-indigo-500 mr-1.5"></i> RFID + Face
                                             </span>
                                         </td>
                                         <td class="py-3 px-2 text-center">
-                                            <span class="px-3 py-1 bg-indigo-100/70 text-indigo-700 text-[11px] font-bold rounded-full inline-block">
-                                                Hadir
-                                            </span>
+                                            @if (in_array($abs->status, ['H', 'Hadir']))
+                                                <span class="px-3 py-1 bg-emerald-100 text-emerald-700 text-[11px] font-extrabold rounded-full inline-block">Hadir</span>
+                                            @elseif (in_array($abs->status, ['T', 'Terlambat']))
+                                                <span class="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-extrabold rounded-full inline-block">Terlambat</span>
+                                            @elseif (in_array($abs->status, ['S', 'Sakit']))
+                                                <span class="px-3 py-1 bg-purple-100 text-purple-700 text-[11px] font-extrabold rounded-md inline-block">Sakit</span>
+                                            @elseif (in_array($abs->status, ['I', 'Izin']))
+                                                <span class="px-3 py-1 bg-sky-100 text-sky-700 text-[11px] font-extrabold rounded-md inline-block">Izin</span>
+                                            @elseif (in_array($abs->status, ['A', 'Alpa']))
+                                                <span class="px-3 py-1 bg-rose-100 text-rose-700 text-[11px] font-extrabold rounded-md inline-block">Alpa</span>
+                                            @else
+                                                <span class="px-3 py-1 bg-slate-100 text-slate-600 text-[11px] font-bold rounded-full inline-block">{{ $abs->status }}</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
