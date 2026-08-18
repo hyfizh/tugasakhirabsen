@@ -52,21 +52,21 @@ class IotController extends Controller
             6  => '11:50', 7  => '13:30', 8  => '14:20', 9  => '15:10', 10 => '16:00',
         ];
 
-        // Gunakan slot jam pelajaran saat ini ($currentJam) sebagai acuan batas waktu presensi
-        $jamIndex = $currentJam ?? ($jadwal && $jadwal->jam_mulai ? (int)$jadwal->jam_mulai : 1);
+        // Slot jam mulai perkuliahan
+        $jamIndex = ($jadwal && $jadwal->jam_mulai) ? (int)$jadwal->jam_mulai : ($currentJam ?? 1);
         $startTime = $sessionStartTimes[$jamIndex] ?? '07:30';
 
-        // Aturan Presensi:
-        // Window Hadir Tepat Waktu (H): 15 menit sebelum jam matkul s/d 15 menit sesudah jam matkul
-        // Contoh Jam ke-4 (10:10) -> Hadir Tepat Waktu (H) dari 09:55 s/d 10:25
+        // Window Time: Absen dibuka 15 menit sebelum jam_mulai dan ditutup 30 menit setelah jam_mulai (atau toleransi)
         $windowStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
-        $windowEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
+        $toleranceMins = ($jadwal && $jadwal->toleransi_keterlambatan) ? (int)$jadwal->toleransi_keterlambatan : 30;
+        if ($toleranceMins < 15) $toleranceMins = 30;
+        $windowEnd = date('H:i', strtotime($startTime . " + {$toleranceMins} minutes"));
 
         if ($time >= $windowStart && $time <= $windowEnd) {
             return 'H'; // Hadir Tepat Waktu (H)
         }
 
-        // STRICT POLICY: Tidak ada status Terlambat (T). Jika tap lewat > 15m -> DENIED (Akses Ditolak)
+        // Diluar rentang toleransi presensi -> Ditolak (DENIED)
         return 'DENIED';
     }
 
@@ -156,40 +156,43 @@ class IotController extends Controller
 
             $currentJam = $this->getCurrentJamPelajaran() ?? 1;
 
-            // 3. Find Schedule for Student's Class
-            $jadwal = Jadwal::where('kelas_id', $mahasiswa->kelas_id)
+            // 3. Find Schedule for Student's Class Today
+            $jadwalsToday = Jadwal::where('kelas_id', $mahasiswa->kelas_id)
                 ->where('hari', $todayName)
-                ->first()
-                ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first();
+                ->orderBy('jam_mulai')
+                ->get();
 
             $sessionEndTimes = [
                 1  => '08:20', 2  => '09:10', 3  => '10:00', 4  => '11:00', 5  => '11:50',
                 6  => '12:40', 7  => '14:20', 8  => '15:10', 9  => '16:00', 10 => '16:50',
             ];
 
-            // Check if schedule for today has ALREADY EXPIRED (Current Time > Schedule End Time)
-            if ($jadwal) {
-                $jamEndIndex = (int) ($jadwal->jam_selesai ?? 4);
-                $endTime = $sessionEndTimes[$jamEndIndex] ?? '16:50';
+            $lastJadwal = $jadwalsToday->last() 
+                ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->orderBy('jam_selesai', 'desc')->first();
 
-                if ($currentTime > $endTime) {
-                    AuditLog::create([
-                        'tipe_log'   => 'ACCESS_DENIED',
-                        'deskripsi'  => "Presensi Ditolak: Sesi perkuliahan hari ini ($todayName) sudah berakhir untuk {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}).",
-                        'ip_address' => $request->ip(),
-                    ]);
+            $lastJamEndIndex = (int) ($lastJadwal ? ($lastJadwal->jam_selesai ?? 4) : 4);
+            $lastEndTime = $sessionEndTimes[$lastJamEndIndex] ?? '16:50';
 
-                    return response()->json([
-                        'status'  => 'schedule_not_found',
-                        'message' => 'Sesi perkuliahan sudah berakhir',
-                        'mahasiswa' => [
-                            'id'           => $mahasiswa->id,
-                            'nim'          => $mahasiswa->nim,
-                            'nama_lengkap' => $mahasiswa->nama_lengkap,
-                        ]
-                    ], 200);
-                }
+            // KETENTUAN 4: Jika tap setelah jam matkul terakhir hari ini berakhir -> REJECT schedule_not_found
+            if ($jadwalsToday->isEmpty() || $currentTime > $lastEndTime) {
+                AuditLog::create([
+                    'tipe_log'   => 'ACCESS_DENIED',
+                    'deskripsi'  => "Presensi Ditolak: Tidak ada jadwal matkul / Sesi hari ini ($todayName) telah berakhir untuk {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}).",
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'status'  => 'schedule_not_found',
+                    'message' => 'Tidak ada jadwal matkul / Sesi hari ini telah berakhir',
+                    'mahasiswa' => [
+                        'id'           => $mahasiswa->id,
+                        'nim'          => $mahasiswa->nim,
+                        'nama_lengkap' => $mahasiswa->nama_lengkap,
+                    ]
+                ], 200);
             }
+
+            $jadwal = $jadwalsToday->first() ?? $lastJadwal;
 
             $mataKuliahNama = ($jadwal && $jadwal->mataKuliah) ? $jadwal->mataKuliah->nama_mk : 'Mata Kuliah Umum';
             $ruanganNama    = ($jadwal && $jadwal->ruangan) ? $jadwal->ruangan : 'Lab IoT';
