@@ -965,6 +965,9 @@ class AdminController extends Controller
         $weeklyTotals = [];
         $monthlyTotals = [];
         
+        // Otomatis tandai Alpa (A) bagi mahasiswa yang tidak absen setelah jam matkul berakhir
+        $this->autoMarkAlphaForPastSchedules($selectedKelasId);
+
         if ($selectedKelasId) {
             $students = Mahasiswa::query()
                 ->where('kelas_id', $selectedKelasId)
@@ -1584,5 +1587,59 @@ class AdminController extends Controller
         ]);
 
         return redirect()->back()->with('warning', "Permohonan pergantian foto {$req->mahasiswa->nama_lengkap} telah ditolak.");
+    }
+
+    private function autoMarkAlphaForPastSchedules(?int $kelasId = null)
+    {
+        $now = \Carbon\Carbon::now('Asia/Jakarta');
+        $todayDate = $now->format('Y-m-d');
+        $currentTime = $now->format('H:i');
+
+        $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        $todayName = $days[date('w')];
+
+        $sessionEndTimes = [
+            1  => '08:20', 2  => '09:10', 3  => '10:00', 4  => '11:00', 5  => '11:50',
+            6  => '12:40', 7  => '14:20', 8  => '15:10', 9  => '16:00', 10 => '16:50',
+        ];
+
+        $jadwalQuery = Jadwal::where('hari', $todayName);
+        if ($kelasId) {
+            $jadwalQuery->where('kelas_id', $kelasId);
+        }
+        $jadwals = $jadwalQuery->get();
+
+        foreach ($jadwals as $jadwal) {
+            $jamEndIndex = (int) ($jadwal->jam_selesai ?? $jadwal->jam_mulai ?? 4);
+            $endTime = $sessionEndTimes[$jamEndIndex] ?? '11:00';
+
+            if ($currentTime > $endTime) {
+                $mahasiswas = Mahasiswa::where('kelas_id', $jadwal->kelas_id)->get();
+                $jamStart = (int) ($jadwal->jam_mulai ?? 1);
+                $jamEnd   = (int) ($jadwal->jam_selesai ?? 4);
+                if ($jamEnd < $jamStart) $jamEnd = $jamStart + 3;
+                if ($jamEnd > 10) $jamEnd = 10;
+
+                foreach ($mahasiswas as $mhs) {
+                    for ($j = $jamStart; $j <= $jamEnd; $j++) {
+                        $exists = Absensi::where('mahasiswa_id', $mhs->id)
+                            ->where('tanggal', $todayDate)
+                            ->where('jam_pelajaran_ke', $j)
+                            ->exists();
+
+                        if (!$exists) {
+                            Absensi::create([
+                                'mahasiswa_id'     => $mhs->id,
+                                'jadwal_id'        => $jadwal->id,
+                                'tanggal'          => $todayDate,
+                                'jam_pelajaran_ke' => $j,
+                                'status'           => 'A',
+                                'waktu_tap_rfid'   => null,
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
