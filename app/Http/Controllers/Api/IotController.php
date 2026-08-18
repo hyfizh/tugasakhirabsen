@@ -180,7 +180,9 @@ class IotController extends Controller
             $jadwalId       = $jadwal ? $jadwal->id : 1;
             
             $statusPresensiCode  = $this->calculateAttendanceStatus($currentJam);
-            $statusPresensiLabel = ($statusPresensiCode === 'H') ? 'HADIR TEPAT WAKTU (H) 🟢' : 'TERLAMBAT (T) 🟡';
+            $statusPresensiLabel = ($statusPresensiCode === 'H') 
+                ? 'HADIR TEPAT WAKTU (H) 🟢' 
+                : 'TERLAMBAT (T) 🟡 (LEWAT DARI JADWAL MATKUL > 15 MIN)';
 
             AuditLog::create([
                 'tipe_log' => 'RFID_VERIFIED',
