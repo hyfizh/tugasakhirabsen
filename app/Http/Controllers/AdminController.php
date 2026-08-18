@@ -925,12 +925,33 @@ class AdminController extends Controller
         if ($mataKuliahList->isEmpty()) {
             $mataKuliahList = MataKuliah::all();
         }
+
+        // Determine Week Number (Minggu ke-1 s/d Minggu ke-5)
+        $currentMonth = (int) date('m');
+        $currentYear  = (int) date('Y');
         
-        $dateStr = sprintf('%04d-%02d-01', $tahun, $bulan);
-        $timestamp = strtotime($dateStr);
+        if ($request->has('minggu')) {
+            $minggu = (int) $request->input('minggu');
+        } else {
+            if ($bulan === $currentMonth && $tahun === $currentYear) {
+                $dayOfMonth = (int) date('j');
+                $minggu = (int) ceil($dayOfMonth / 7);
+                if ($minggu > 4) $minggu = 4;
+            } else {
+                $minggu = 1;
+            }
+        }
+
+        if (!$request->has('minggu') && $bulan === $currentMonth && $tahun === $currentYear) {
+            $monday = date('Y-m-d', strtotime('monday this week'));
+        } else {
+            $firstDayOfMonth = sprintf('%04d-%02d-01', $tahun, $bulan);
+            $startOffset = ($minggu - 1) * 7;
+            $targetDay = date('Y-m-d', strtotime("+$startOffset days", strtotime($firstDayOfMonth)));
+            $monday = date('Y-m-d', strtotime('monday this week', strtotime($targetDay)));
+        }
         
-        $monday = date('Y-m-d', strtotime('monday this week', $timestamp));
-        $saturday = date('Y-m-d', strtotime('saturday this week', $timestamp));
+        $saturday = date('Y-m-d', strtotime('+5 days', strtotime($monday)));
         
         $daysOfWeek = [
             'Senin'   => date('Y-m-d', strtotime($monday)),
@@ -968,7 +989,7 @@ class AdminController extends Controller
                 $absensiRecords = $weeklyQuery->get();
                     
                 foreach ($absensiRecords as $rec) {
-                    $dateKey = $rec->tanggal->format('Y-m-d');
+                    $dateKey = is_string($rec->tanggal) ? substr($rec->tanggal, 0, 10) : $rec->tanggal->format('Y-m-d');
                     $weeklyAbsensi[$rec->mahasiswa_id][$dateKey][$rec->jam_pelajaran_ke] = $rec->status;
                     
                     if (!isset($weeklyTotals[$rec->mahasiswa_id])) {
@@ -1008,8 +1029,52 @@ class AdminController extends Controller
         return view('admin.laporan.rekap', compact(
             'kelas', 'selectedKelasId', 'selectedKelas', 'selectedMatkulId', 'mataKuliahList', 'dateStr', 'monday', 'saturday',
             'daysOfWeek', 'students', 'weeklyAbsensi', 'weeklyTotals', 'monthlyTotals',
-            'bulan', 'tahun', 'monthsList', 'yearsList'
+            'bulan', 'tahun', 'minggu', 'monthsList', 'yearsList'
         ));
+    }
+
+    public function updateAbsensiStatus(Request $request)
+    {
+        $request->validate([
+            'mahasiswa_id' => 'required|exists:mahasiswas,id',
+            'tanggal'      => 'required|date',
+            'status'       => 'required|in:H,T,S,I,A,DELETE',
+        ]);
+
+        $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
+
+        if ($request->status === 'DELETE') {
+            Absensi::where('mahasiswa_id', $mahasiswa->id)
+                ->where('tanggal', $request->tanggal)
+                ->delete();
+            return redirect()->back()->with('success', 'Status absensi berhasil dihapus.');
+        }
+
+        $jadwal = Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first();
+
+        Absensi::updateOrCreate(
+            [
+                'mahasiswa_id' => $mahasiswa->id,
+                'tanggal'      => $request->tanggal,
+            ],
+            [
+                'jadwal_id'              => $jadwal ? $jadwal->id : 1,
+                'jam_pelajaran_ke'       => 1,
+                'status'                 => $request->status,
+                'waktu_tap_rfid'         => now(),
+                'waktu_verifikasi_wajah' => now(),
+            ]
+        );
+
+        $statusNames = [
+            'H' => 'Hadir (H)',
+            'T' => 'Terlambat (T)',
+            'S' => 'Sakit (S)',
+            'I' => 'Izin (I)',
+            'A' => 'Alpa (A)',
+        ];
+
+        return redirect()->back()->with('success', 'Status absensi ' . $mahasiswa->nama_lengkap . ' pada tanggal ' . date('d/m/Y', strtotime($request->tanggal)) . ' berhasil diubah menjadi ' . ($statusNames[$request->status] ?? $request->status) . '.');
     }
 
     public function downloadRekapPdf(Request $request)

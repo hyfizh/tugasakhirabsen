@@ -50,7 +50,12 @@
     <div class="space-y-6 pb-6" x-data="{
         selectedKelas: '{{ $selectedKelas->nama_kelas ?? 'Teknologi Informasi 3A' }}',
         rekapTab: 'mingguan',
-        openModal: false
+        openModal: false,
+        editModalOpen: false,
+        editMhsId: '',
+        editMhsNama: '',
+        editTanggal: '',
+        editStatus: 'H'
     }">
         
         <!-- Printable Kop Surat Header for PDF Export -->
@@ -60,7 +65,7 @@
             <p class="text-xs text-slate-700 font-medium">Kampus Limau Manis, Pauh, Kota Padang, Sumatera Barat 25163 &bull; Telepon: (0751) 72590</p>
             <div class="border-t border-slate-900 mt-2 pt-2">
                 <h3 class="text-sm font-extrabold uppercase underline text-black" x-text="rekapTab === 'mingguan' ? 'LAPORAN REKAPITULASI PRESENSI MINGGUAN (SENIN - SABTU)' : 'LAPORAN REKAPITULASI TOTAL PRESENSI MAHASISWA'"></h3>
-                <p class="text-xs font-semibold text-slate-800 mt-0.5">Kelas: {{ $selectedKelas->nama_kelas ?? 'TI-3A' }} &bull; Periode: {{ $monthsList[$bulan] ?? '' }} {{ $tahun }} &bull; Semester: Ganjil</p>
+                <p class="text-xs font-semibold text-slate-800 mt-0.5">Kelas: {{ $selectedKelas->nama_kelas ?? 'TI-3A' }} &bull; Periode: {{ $monthsList[$bulan] ?? '' }} {{ $tahun }} (Minggu ke-{{ $minggu }}) &bull; Semester: Ganjil</p>
             </div>
         </div>
 
@@ -72,12 +77,12 @@
             </div>
         </div>
 
-        <!-- Filter Bar Card (3 Dropdowns: Kelas, Bulan, Tahun) (Screen Only) -->
+        <!-- Filter Bar Card (4 Dropdowns: Kelas, Minggu, Bulan, Tahun) (Screen Only) -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 no-print">
             <form action="{{ route('admin.laporan.rekap') }}" method="GET" id="rekap-filter-form" class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
                 
                 <!-- KELAS -->
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-3">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">KELAS</label>
                     <select name="kelas_id" id="kelas_id" onchange="this.form.submit()" 
                             class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
@@ -89,8 +94,20 @@
                     </select>
                 </div>
 
+                <!-- MINGGU KE- -->
+                <div class="sm:col-span-3">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MINGGU KE-</label>
+                    <select name="minggu" id="minggu" onchange="this.form.submit()"
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
+                        <option value="1" {{ (int)$minggu === 1 ? 'selected' : '' }}>Minggu ke-1 (Tgl 01-07)</option>
+                        <option value="2" {{ (int)$minggu === 2 ? 'selected' : '' }}>Minggu ke-2 (Tgl 08-14)</option>
+                        <option value="3" {{ (int)$minggu === 3 ? 'selected' : '' }}>Minggu ke-3 (Tgl 15-21)</option>
+                        <option value="4" {{ (int)$minggu === 4 ? 'selected' : '' }}>Minggu ke-4 (Tgl 22-28)</option>
+                    </select>
+                </div>
+
                 <!-- BULAN -->
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-3">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">BULAN</label>
                     <select name="bulan" id="bulan" onchange="this.form.submit()"
                             class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
@@ -103,7 +120,7 @@
                 </div>
 
                 <!-- TAHUN -->
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-3">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">TAHUN</label>
                     <select name="tahun" id="tahun" onchange="this.form.submit()"
                             class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none cursor-pointer">
@@ -210,19 +227,22 @@
                                         }
                                     @endphp
                                     <td class="py-4 px-4 text-center">
-                                        @if ($status === 'H')
-                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-md shadow-xs">H</span>
-                                        @elseif ($status === 'T')
-                                            <span class="px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold rounded-md shadow-xs">T</span>
-                                        @elseif ($status === 'I')
-                                            <span class="px-2 py-1 bg-sky-100 text-sky-800 text-[10px] font-extrabold rounded-md shadow-xs">I</span>
-                                        @elseif ($status === 'S')
-                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-[10px] font-extrabold rounded-md shadow-xs">S</span>
-                                        @elseif ($status === 'A')
-                                            <span class="px-2 py-1 bg-rose-100 text-rose-800 text-[10px] font-extrabold rounded-md shadow-xs">A</span>
-                                        @else
-                                            <span class="text-slate-300 font-mono text-[10px]">-</span>
-                                        @endif
+                                        <button type="button" @click="editMhsId = '{{ $mhs->id }}'; editMhsNama = '{{ $mhs->nama_lengkap }}'; editTanggal = '{{ $dateVal }}'; editStatus = '{{ $status ?: 'H' }}'; openModal = true"
+                                                class="focus:outline-none transform hover:scale-110 transition-transform cursor-pointer" title="Klik untuk ubah status presensi {{ $mhs->nama_lengkap }} ({{ $dayName }} - {{ date('d/m/Y', strtotime($dateVal)) }})">
+                                            @if ($status === 'H')
+                                                <span class="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold rounded-md shadow-xs">H</span>
+                                            @elseif ($status === 'T')
+                                                <span class="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-extrabold rounded-md shadow-xs">T</span>
+                                            @elseif ($status === 'I')
+                                                <span class="px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-[10px] font-extrabold rounded-md shadow-xs">I</span>
+                                            @elseif ($status === 'S')
+                                                <span class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 text-[10px] font-extrabold rounded-md shadow-xs">S</span>
+                                            @elseif ($status === 'A')
+                                                <span class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-extrabold rounded-md shadow-xs">A</span>
+                                            @else
+                                                <span class="text-slate-300 hover:text-indigo-600 font-mono text-[10px]">-</span>
+                                            @endif
+                                        </button>
                                     </td>
                                 @endforeach
 
@@ -366,7 +386,7 @@
                         <!-- Pilih Mahasiswa -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Pilih Mahasiswa</label>
-                            <select name="mahasiswa_id" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                            <select name="mahasiswa_id" required x-model="editMhsId" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
                                 @foreach ($students as $mhs)
                                     <option value="{{ $mhs->id }}">{{ $mhs->nim }} - {{ $mhs->nama_lengkap }}</option>
                                 @endforeach
@@ -376,18 +396,19 @@
                         <!-- Tanggal Absensi -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tanggal Absensi</label>
-                            <input type="date" name="tanggal" value="{{ date('Y-m-d') }}" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                            <input type="date" name="tanggal" required x-model="editTanggal" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
                         </div>
 
                         <!-- Status Baru -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Status Kehadiran Baru</label>
-                            <select name="status" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
-                                <option value="S">Sakit (S) — Berdasarkan Surat Dokter</option>
-                                <option value="I">Izin (I) — Berdasarkan Surat Izin Resmi</option>
+                            <select name="status" required x-model="editStatus" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
                                 <option value="H">Hadir Tepat Waktu (H)</option>
                                 <option value="T">Terlambat (T)</option>
+                                <option value="S">Sakit (S) — Berdasarkan Surat Dokter</option>
+                                <option value="I">Izin (I) — Berdasarkan Surat Izin Resmi</option>
                                 <option value="A">Alpa (A)</option>
+                                <option value="DELETE">❌ Hapus Status Absensi (-)</option>
                             </select>
                         </div>
 
