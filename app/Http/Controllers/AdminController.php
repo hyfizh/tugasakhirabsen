@@ -926,6 +926,8 @@ class AdminController extends Controller
             $mataKuliahList = MataKuliah::all();
         }
 
+        $dateStr = sprintf('%04d-%02d-01', $tahun, $bulan);
+
         // Determine Week Number (Minggu ke-1 s/d Minggu ke-5)
         $currentMonth = (int) date('m');
         $currentYear  = (int) date('Y');
