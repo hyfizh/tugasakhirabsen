@@ -52,13 +52,13 @@ class IotController extends Controller
             6  => '11:50', 7  => '13:30', 8  => '14:20', 9  => '15:10', 10 => '16:00',
         ];
 
-        // Gunakan jam_mulai jadwal matkul (misal Jam 1 = 07:30) sebagai acuan awal matkul
-        $startJamIndex = ($jadwal && $jadwal->jam_mulai) ? (int)$jadwal->jam_mulai : ($currentJam ?? 1);
-        $startTime = $sessionStartTimes[$startJamIndex] ?? '07:30';
+        // Gunakan slot jam pelajaran saat ini ($currentJam) sebagai acuan batas waktu presensi
+        $jamIndex = $currentJam ?? ($jadwal && $jadwal->jam_mulai ? (int)$jadwal->jam_mulai : 1);
+        $startTime = $sessionStartTimes[$jamIndex] ?? '07:30';
 
         // Aturan Presensi:
-        // Window Hadir Tepat Waktu (H): 15 menit sebelum matkul dimulai s/d 15 menit sesudah matkul dimulai
-        // Contoh Matkul Jam 07:30 -> Hadir (H) dari 07:15 s/d 07:45
+        // Window Hadir Tepat Waktu (H): 15 menit sebelum jam matkul s/d 15 menit sesudah jam matkul
+        // Contoh Jam ke-4 (10:10) -> Hadir Tepat Waktu (H) dari 09:55 s/d 10:25
         $windowStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
         $windowEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
 
@@ -66,12 +66,11 @@ class IotController extends Controller
             return 'H'; // Hadir Tepat Waktu (H)
         }
 
-        // Jika tap lewat dari 15 menit setelah matkul dimulai (misal > 07:45) -> Status Terlambat (T)
         if ($time > $windowEnd) {
             return 'T'; // Terlambat (T)
         }
 
-        return 'T'; // Default jika diluar window awal adalah Terlambat
+        return 'H';
     }
 
     public function heartbeat(Request $request)
