@@ -127,13 +127,13 @@
                 <table class="w-full text-left text-xs border-collapse">
                     <thead>
                         <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
-                            <th class="py-4 px-6">Student</th>
+                            <th class="py-4 px-6">NAMA MAHASISWA</th>
                             <th class="py-4 px-6">NIM</th>
-                            <th class="py-4 px-6">Class</th>
-                            <th class="py-4 px-6 text-center">Dataset AI</th>
-                            <th class="py-4 px-6 text-center">RFID Status</th>
-                            <th class="py-4 px-6 text-center">Status Pass</th>
-                            <th class="py-4 px-6 text-right">Actions</th>
+                            <th class="py-4 px-6">KELAS</th>
+                            <th class="py-4 px-6 text-center">FOTO WAJAH</th>
+                            <th class="py-4 px-6 text-center">STATUS RFID</th>
+                            <th class="py-4 px-6 text-center">STATUS PASSWORD</th>
+                            <th class="py-4 px-6 text-right">AKSI</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 font-medium">
@@ -247,110 +247,10 @@
                                 </td>
                             </tr>
                         @empty
-                            <!-- Demo Rows Matching User Mockup if Empty -->
-                            <tr class="hover:bg-slate-50/80 transition-colors">
-                                <td class="py-4 px-6">
-                                    <div class="flex items-center space-x-3.5">
-                                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120" 
-                                             alt="Student Avatar" class="w-9 h-9 rounded-full object-cover shadow-sm border border-slate-200">
-                                        <div>
-                                            <span class="font-extrabold text-slate-900 text-sm block leading-tight">Budi Santoso</span>
-                                            <span class="text-[11px] text-slate-400 font-medium block mt-0.5">budi.s@student.edu</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="bg-slate-100/90 text-slate-700 font-mono text-xs px-3 py-1.5 rounded-lg font-semibold inline-block border border-slate-200/50">
-                                        2241720001
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-slate-600 font-semibold">TI-3A</td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-emerald-50 text-emerald-600 font-bold text-xs rounded-full border border-emerald-200/80 inline-flex items-center">
-                                        <i class="fa-regular fa-circle-check text-sm mr-1.5"></i> Face Enrolled
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-blue-50 text-blue-600 font-bold text-xs rounded-full border border-blue-200/80 inline-flex items-center">
-                                        <i class="fa-solid fa-credit-card text-xs mr-1.5"></i> Linked: 9A:2B:3C
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-right">
-                                    <div class="flex items-center justify-end space-x-2.5">
-                                        <button class="text-slate-400 hover:text-indigo-600 transition-colors p-1"><i class="fa-solid fa-pencil text-sm"></i></button>
-                                        <button class="text-slate-400 hover:text-rose-600 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <tr class="hover:bg-slate-50/80 transition-colors">
-                                <td class="py-4 px-6">
-                                    <div class="flex items-center space-x-3.5">
-                                        <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=120" 
-                                             alt="Student Avatar" class="w-9 h-9 rounded-full object-cover shadow-sm border border-slate-200">
-                                        <div>
-                                            <span class="font-extrabold text-slate-900 text-sm block leading-tight">Siti Aminah</span>
-                                            <span class="text-[11px] text-slate-400 font-medium block mt-0.5">siti.a@student.edu</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="bg-slate-100/90 text-slate-700 font-mono text-xs px-3 py-1.5 rounded-lg font-semibold inline-block border border-slate-200/50">
-                                        2241720042
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-slate-600 font-semibold">MI-2B</td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-emerald-50 text-emerald-600 font-bold text-xs rounded-full border border-emerald-200/80 inline-flex items-center">
-                                        <i class="fa-regular fa-circle-check text-sm mr-1.5"></i> Face Enrolled
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-slate-100 text-slate-500 font-bold text-xs rounded-full inline-flex items-center">
-                                        <i class="fa-solid fa-credit-card-slash text-xs mr-1.5"></i> Unlinked
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-right">
-                                    <div class="flex items-center justify-end space-x-2.5">
-                                        <button class="text-slate-400 hover:text-indigo-600 transition-colors p-1"><i class="fa-solid fa-pencil text-sm"></i></button>
-                                        <button class="text-slate-400 hover:text-rose-600 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <tr class="hover:bg-slate-50/80 transition-colors">
-                                <td class="py-4 px-6">
-                                    <div class="flex items-center space-x-3.5">
-                                        <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center text-xs shadow-sm border border-indigo-200/60">
-                                            HW
-                                        </div>
-                                        <div>
-                                            <span class="font-extrabold text-slate-900 text-sm block leading-tight">Hendra Wijaya</span>
-                                            <span class="text-[11px] text-slate-400 font-medium block mt-0.5">hendra.w@student.edu</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-4 px-6">
-                                    <span class="bg-slate-100/90 text-slate-700 font-mono text-xs px-3 py-1.5 rounded-lg font-semibold inline-block border border-slate-200/50">
-                                        2341720115
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-slate-600 font-semibold">SI-1C</td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-rose-50 text-rose-600 font-bold text-xs rounded-full border border-rose-200/80 inline-flex items-center">
-                                        <i class="fa-regular fa-circle-xmark text-sm mr-1.5"></i> No Face
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-center">
-                                    <span class="px-3.5 py-1 bg-slate-100 text-slate-500 font-bold text-xs rounded-full inline-flex items-center">
-                                        <i class="fa-solid fa-credit-card-slash text-xs mr-1.5"></i> Unlinked
-                                    </span>
-                                </td>
-                                <td class="py-4 px-6 text-right">
-                                    <div class="flex items-center justify-end space-x-2.5">
-                                        <button class="text-slate-400 hover:text-indigo-600 transition-colors p-1"><i class="fa-solid fa-pencil text-sm"></i></button>
-                                        <button class="text-slate-400 hover:text-rose-600 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                                    </div>
+                            <tr>
+                                <td colspan="7" class="py-12 text-center text-slate-400">
+                                    <i class="fa-solid fa-users-slash text-3xl mb-2 text-slate-300 block"></i>
+                                    Tidak ada data mahasiswa terdaftar.
                                 </td>
                             </tr>
                         @endforelse
@@ -361,7 +261,7 @@
             <!-- Table Footer & Pagination -->
             <div class="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500 font-medium">
                 <div>
-                    Showing 1-{{ count($mahasiswas) > 0 ? count($mahasiswas) : 10 }} of {{ count($mahasiswas) > 0 ? count($mahasiswas) : 1240 }} students
+                    Menampilkan total {{ count($mahasiswas) }} Mahasiswa terdaftar
                 </div>
 
                 <!-- Pagination Buttons -->

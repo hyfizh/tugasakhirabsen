@@ -241,40 +241,44 @@ class IotController extends Controller
 
             // Route: Log access granted / verification results
             if ($tipeLog === 'ACCESS_GRANTED') {
-                $mahasiswa = Mahasiswa::findOrFail($request->mahasiswa_id);
-                $jadwal = Jadwal::find($request->jadwal_id);
-                $currentJam = $this->getCurrentJamPelajaran();
+                $uid = $request->rfid_uid;
+                $mahasiswa = $request->mahasiswa_id 
+                    ? Mahasiswa::find($request->mahasiswa_id) 
+                    : ($uid ? Mahasiswa::where('rfid_uid', $uid)->first() : null);
 
-                // Check existing record for today
-                $existingAbsensi = Absensi::where('mahasiswa_id', $mahasiswa->id)
-                    ->where('jadwal_id', $request->jadwal_id)
-                    ->where('tanggal', date('Y-m-d'))
-                    ->first();
+                if (!$mahasiswa) {
+                    AuditLog::create([
+                        'tipe_log' => 'ACCESS_DENIED',
+                        'deskripsi' => "Akses Ditolak: Kartu RFID $uid belum terdaftar pada mahasiswa mana pun.",
+                        'ip_address' => $request->ip(),
+                    ]);
 
-                if ($existingAbsensi) {
-                    // Retain status 'H' if already recorded on 1st tap
-                    $statusKehadiran = $existingAbsensi->status === 'H' ? 'H' : $this->calculateAttendanceStatus($currentJam);
-                    $recordedJam = $existingAbsensi->jam_pelajaran_ke;
-                } else {
-                    // First tap of the day for this subject
-                    $recordedJam = $currentJam;
-                    // If tapping on 2nd hour or later of a multi-hour subject without tapping on 1st hour
-                    if ($jadwal && $currentJam > $jadwal->jam_mulai) {
-                        $statusKehadiran = 'T'; // Terlambat (Masuk Jam Kedua)
-                    } else {
-                        $statusKehadiran = $this->calculateAttendanceStatus($currentJam);
-                    }
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Kartu RFID belum terdaftar pada mahasiswa mana pun.',
+                    ], 404);
                 }
+
+                $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                $todayName = $days[date('w')];
+                $currentJam = $this->getCurrentJamPelajaran() ?? 1;
+
+                $jadwal = $request->jadwal_id 
+                    ? Jadwal::find($request->jadwal_id) 
+                    : (Jadwal::where('kelas_id', $mahasiswa->kelas_id)->where('hari', $todayName)->first() 
+                       ?? Jadwal::where('kelas_id', $mahasiswa->kelas_id)->first());
+
+                $jadwalId = $jadwal ? $jadwal->id : 1;
 
                 $absensi = Absensi::updateOrCreate(
                     [
                         'mahasiswa_id' => $mahasiswa->id,
-                        'jadwal_id'    => $request->jadwal_id,
+                        'jadwal_id'    => $jadwalId,
                         'tanggal'      => date('Y-m-d'),
                     ],
                     [
-                        'jam_pelajaran_ke'       => $recordedJam,
-                        'status'                 => $statusKehadiran,
+                        'jam_pelajaran_ke'       => $currentJam,
+                        'status'                 => 'H',
                         'waktu_tap_rfid'         => date('Y-m-d H:i:s'),
                         'waktu_verifikasi_wajah' => date('Y-m-d H:i:s'),
                     ]
@@ -292,16 +296,15 @@ class IotController extends Controller
                     }
                 }
 
-                $statusLabel = $statusKehadiran === 'T' ? ($jadwal && $currentJam > $jadwal->jam_mulai ? 'Terlambat (Masuk Jam ke-' . $currentJam . ')' : 'Terlambat') : 'Hadir Tepat Waktu';
                 AuditLog::create([
                     'tipe_log'   => 'ACCESS_GRANTED',
-                    'deskripsi'  => "Akses Diberikan: {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) berhasil absen ($statusLabel) pada mata kuliah.",
+                    'deskripsi'  => "Akses Diberikan: {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) berhasil absen Hadir Tepat Waktu.",
                     'ip_address' => $request->ip(),
                 ]);
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Kehadiran berhasil disimpan (' . $statusLabel . ').',
+                    'message' => 'Kehadiran berhasil disimpan (Hadir).',
                     'absensi' => $absensi,
                 ]);
             }

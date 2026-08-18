@@ -275,7 +275,7 @@ class AdminController extends Controller
         $request->validate([
             'nim'               => 'required|string|unique:mahasiswas,nim,' . $mahasiswa->id,
             'nama_lengkap'      => 'required|string|max:100',
-            'email'             => 'required|email|unique:mahasiswas,email,' . $mahasiswa->id,
+            'email'             => 'nullable|email|unique:mahasiswas,email,' . $mahasiswa->id,
             'no_hp'             => 'nullable|string|max:20',
             'kelas_id'          => 'required|exists:kelas,id',
             'rfid_uid'          => 'nullable|string|unique:mahasiswas,rfid_uid,' . $mahasiswa->id,
@@ -283,7 +283,23 @@ class AdminController extends Controller
             'foto_wajah'        => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $updateData = $request->only('nim', 'nama_lengkap', 'email', 'no_hp', 'kelas_id', 'rfid_uid');
+        $updateData = [
+            'nim'          => trim($request->nim),
+            'nama_lengkap' => trim($request->nama_lengkap),
+            'kelas_id'     => $request->kelas_id,
+        ];
+
+        if ($request->has('email')) {
+            $updateData['email'] = $request->filled('email') ? trim($request->email) : null;
+        }
+
+        if ($request->has('no_hp')) {
+            $updateData['no_hp'] = $request->filled('no_hp') ? trim($request->no_hp) : null;
+        }
+
+        if ($request->has('rfid_uid')) {
+            $updateData['rfid_uid'] = $request->filled('rfid_uid') ? trim($request->rfid_uid) : null;
+        }
 
         if ($request->filled('foto_wajah_base64')) {
             $base64Image = $request->foto_wajah_base64;
@@ -309,13 +325,14 @@ class AdminController extends Controller
         $mahasiswa->update($updateData);
         
         if ($mahasiswa->user) {
-            $mahasiswa->user->update([
-                'username' => $request->nim,
-                'email'    => $request->email
-            ]);
+            $userUpdate = ['username' => trim($request->nim)];
+            if (isset($updateData['email'])) {
+                $userUpdate['email'] = $updateData['email'];
+            }
+            $mahasiswa->user->update($userUpdate);
         }
 
-        return redirect()->route('admin.mahasiswa.index')->with('success', 'Mahasiswa berhasil diperbarui.');
+        return redirect()->route('admin.mahasiswa.index')->with('success', 'Data Mahasiswa berhasil diperbarui.');
     }
 
     public function destroyMahasiswa($id)
