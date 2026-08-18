@@ -159,21 +159,30 @@
                 </div>
             </div>
 
-            <!-- TAB MODE SWITCHER (Mingguan vs Bulanan Total) -->
-            <div class="flex border-b border-slate-100 space-x-2 px-6 no-print">
+            <!-- TAB MODE SWITCHER (Mingguan vs Rincian Jam 1-10 vs Bulanan Total) -->
+            <div class="flex border-b border-slate-100 space-x-2 px-6 no-print overflow-x-auto">
                 <button type="button" 
                         @click="rekapTab = 'mingguan'" 
                         :class="rekapTab === 'mingguan' ? 'border-indigo-600 text-indigo-600 font-extrabold bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 font-bold'"
-                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl">
+                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl whitespace-nowrap">
                     <i class="fa-solid fa-calendar-week"></i>
-                    <span>(1) Rekap Absen Mingguan (Per Hari: Senin - Sabtu)</span>
+                    <span>(1) Rekap Harian (Senin - Sabtu)</span>
                 </button>
+
+                <button type="button" 
+                        @click="rekapTab = 'jam'" 
+                        :class="rekapTab === 'jam' ? 'border-indigo-600 text-indigo-600 font-extrabold bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 font-bold'"
+                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl whitespace-nowrap">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>(2) Rincian Per Jam Matkul (Jam 1 s/d 10)</span>
+                </button>
+
                 <button type="button" 
                         @click="rekapTab = 'bulanan'" 
                         :class="rekapTab === 'bulanan' ? 'border-indigo-600 text-indigo-600 font-extrabold bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 font-bold'"
-                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl">
+                        class="py-3 px-4 border-b-2 text-xs flex items-center space-x-2 transition-all cursor-pointer rounded-t-xl whitespace-nowrap">
                     <i class="fa-solid fa-chart-pie"></i>
-                    <span>(2) Rekap Total Bulanan &amp; Persentase (%)</span>
+                    <span>(3) Rekap Total Bulanan &amp; Persentase (%)</span>
                 </button>
             </div>
 
@@ -220,25 +229,28 @@
                                 @foreach ($daysOfWeek as $dayName => $dateVal)
                                     @php
                                         $status = null;
+                                        $jamsList = [];
                                         if (isset($weeklyAbsensi[$mhs->id][$dateVal])) {
                                             foreach ($weeklyAbsensi[$mhs->id][$dateVal] as $jam => $st) {
                                                 $status = $st;
+                                                $jamsList[] = $jam;
                                             }
                                         }
+                                        $jamText = !empty($jamsList) ? 'Jam ' . min($jamsList) . (count($jamsList) > 1 ? '-' . max($jamsList) : '') : '';
                                     @endphp
                                     <td class="py-4 px-4 text-center">
                                         <button type="button" @click="editMhsId = '{{ $mhs->id }}'; editMhsNama = '{{ $mhs->nama_lengkap }}'; editTanggal = '{{ $dateVal }}'; editStatus = '{{ $status ?: 'H' }}'; openModal = true"
-                                                class="focus:outline-none transform hover:scale-110 transition-transform cursor-pointer" title="Klik untuk ubah status presensi {{ $mhs->nama_lengkap }} ({{ $dayName }} - {{ date('d/m/Y', strtotime($dateVal)) }})">
+                                                class="focus:outline-none transform hover:scale-110 transition-transform cursor-pointer" title="Klik untuk ubah status presensi {{ $mhs->nama_lengkap }} ({{ $dayName }} - {{ date('d/m/Y', strtotime($dateVal)) }}) {{ $jamText }}">
                                             @if ($status === 'H')
-                                                <span class="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold rounded-md shadow-xs">H</span>
+                                                <span class="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold rounded-md shadow-xs">H {{ $jamText ? "($jamText)" : '' }}</span>
                                             @elseif ($status === 'T')
-                                                <span class="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-extrabold rounded-md shadow-xs">T</span>
+                                                <span class="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-extrabold rounded-md shadow-xs">T {{ $jamText ? "($jamText)" : '' }}</span>
                                             @elseif ($status === 'I')
-                                                <span class="px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-[10px] font-extrabold rounded-md shadow-xs">I</span>
+                                                <span class="px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-[10px] font-extrabold rounded-md shadow-xs">I {{ $jamText ? "($jamText)" : '' }}</span>
                                             @elseif ($status === 'S')
-                                                <span class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 text-[10px] font-extrabold rounded-md shadow-xs">S</span>
+                                                <span class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 text-[10px] font-extrabold rounded-md shadow-xs">S {{ $jamText ? "($jamText)" : '' }}</span>
                                             @elseif ($status === 'A')
-                                                <span class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-extrabold rounded-md shadow-xs">A</span>
+                                                <span class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-extrabold rounded-md shadow-xs">A {{ $jamText ? "($jamText)" : '' }}</span>
                                             @else
                                                 <span class="text-slate-300 hover:text-indigo-600 font-mono text-[10px]">-</span>
                                             @endif
@@ -262,7 +274,84 @@
                 </table>
             </div>
 
-            <!-- MODE 2: TABEL REKAP BULANAN TOTAL & PERSENTASE -->
+            <!-- MODE 2: TABEL RINCIAN PRESENSI PER JAM MATKUL (JAM 1 S/D 10) -->
+            <div x-show="rekapTab === 'jam'" :class="rekapTab === 'jam' ? 'print-tab-active' : ''" x-transition class="overflow-x-auto" style="display: none;">
+                @php
+                    $jamTimes = [
+                        1  => '07:30', 2  => '08:20', 3  => '09:10', 4  => '10:10', 5  => '11:00',
+                        6  => '11:50', 7  => '13:30', 8  => '14:20', 9  => '15:10', 10 => '16:00',
+                    ];
+                @endphp
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
+                            <th class="py-3.5 px-6">NIM</th>
+                            <th class="py-3.5 px-6">NAMA MAHASISWA</th>
+                            @foreach ($jamTimes as $jNum => $jTime)
+                                <th class="py-3.5 px-2 text-center min-w-[55px]">
+                                    <div class="text-indigo-700 font-extrabold">JAM {{ $jNum }}</div>
+                                    <div class="text-[9px] text-slate-400 font-mono font-normal">{{ $jTime }}</div>
+                                </th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium">
+                        @forelse ($students as $mhs)
+                            <tr class="hover:bg-slate-50/80 transition-colors">
+                                <td class="py-4 px-6 font-mono text-slate-500 text-xs">{{ $mhs->nim }}</td>
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center space-x-3">
+                                        @if ($mhs->foto_wajah)
+                                            <img src="{{ asset('storage/' . $mhs->foto_wajah) }}" alt="Avatar" class="w-7 h-7 rounded-full object-cover shadow-sm no-print">
+                                        @else
+                                            <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-extrabold text-[10px] flex items-center justify-center no-print">
+                                                {{ strtoupper(substr($mhs->nama_lengkap, 0, 2)) }}
+                                            </div>
+                                        @endif
+                                        <span class="font-bold text-slate-800 text-xs">{{ $mhs->nama_lengkap }}</span>
+                                    </div>
+                                </td>
+
+                                @foreach ($jamTimes as $jNum => $jTime)
+                                    @php
+                                        $jamStatus = null;
+                                        foreach ($daysOfWeek as $dVal) {
+                                            if (isset($weeklyAbsensi[$mhs->id][$dVal][$jNum])) {
+                                                $jamStatus = $weeklyAbsensi[$mhs->id][$dVal][$jNum];
+                                                break;
+                                            }
+                                        }
+                                    @endphp
+                                    <td class="py-4 px-2 text-center">
+                                        @if ($jamStatus === 'H')
+                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-md shadow-xs" title="Jam {{ $jNum }}: Hadir">H</span>
+                                        @elseif ($jamStatus === 'T')
+                                            <span class="px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold rounded-md shadow-xs" title="Jam {{ $jNum }}: Terlambat">T</span>
+                                        @elseif ($jamStatus === 'I')
+                                            <span class="px-2 py-1 bg-sky-100 text-sky-800 text-[10px] font-extrabold rounded-md shadow-xs" title="Jam {{ $jNum }}: Izin">I</span>
+                                        @elseif ($jamStatus === 'S')
+                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-[10px] font-extrabold rounded-md shadow-xs" title="Jam {{ $jNum }}: Sakit">S</span>
+                                        @elseif ($jamStatus === 'A')
+                                            <span class="px-2 py-1 bg-rose-100 text-rose-800 text-[10px] font-extrabold rounded-md shadow-xs" title="Jam {{ $jNum }}: Alpa">A</span>
+                                        @else
+                                            <span class="text-slate-300 font-mono text-[10px]">-</span>
+                                        @endif
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="12" class="py-12 px-6 text-center text-slate-400">
+                                    <i class="fa-solid fa-calendar-xmark text-3xl mb-2 text-slate-300 block"></i>
+                                    Tidak ada data rincian jam matkul.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MODE 3: TABEL REKAP BULANAN TOTAL & PERSENTASE -->
             <div x-show="rekapTab === 'bulanan'" :class="rekapTab === 'bulanan' ? 'print-tab-active' : ''" x-transition class="overflow-x-auto" style="display: none;">
                 <table class="w-full text-left text-xs border-collapse">
                     <thead>
