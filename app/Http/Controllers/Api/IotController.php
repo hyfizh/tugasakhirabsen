@@ -43,41 +43,30 @@ class IotController extends Controller
         return null;
     }
 
-    private function calculateAttendanceStatus(?int $jamPelajaran): string
+    private function calculateAttendanceStatus(?int $currentJam, ?Jadwal $jadwal = null): string
     {
-        if (!$jamPelajaran) return 'H';
-
         $time = date('H:i');
-        $sessionTimes = [
-            1  => ['start' => '07:30', 'end' => '08:20'],
-            2  => ['start' => '08:20', 'end' => '09:10'],
-            3  => ['start' => '09:10', 'end' => '10:00'],
-            4  => ['start' => '10:10', 'end' => '11:00'],
-            5  => ['start' => '11:00', 'end' => '11:50'],
-            6  => ['start' => '11:50', 'end' => '12:40'],
-            7  => ['start' => '13:30', 'end' => '14:20'],
-            8  => ['start' => '14:20', 'end' => '15:10'],
-            9  => ['start' => '15:10', 'end' => '16:00'],
-            10 => ['start' => '16:00', 'end' => '16:50'],
+        
+        $sessionStartTimes = [
+            1  => '07:30', 2  => '08:20', 3  => '09:10', 4  => '10:10', 5  => '11:00',
+            6  => '11:50', 7  => '13:30', 8  => '14:20', 9  => '15:10', 10 => '16:00',
         ];
 
-        if (!isset($sessionTimes[$jamPelajaran])) {
-            return 'H';
-        }
-
-        $startTime = $sessionTimes[$jamPelajaran]['start'];
+        // Gunakan jam_mulai jadwal matkul (misal Jam 1 = 07:30) sebagai acuan awal matkul
+        $startJamIndex = ($jadwal && $jadwal->jam_mulai) ? (int)$jadwal->jam_mulai : ($currentJam ?? 1);
+        $startTime = $sessionStartTimes[$startJamIndex] ?? '07:30';
 
         // Aturan Presensi:
         // Window Hadir Tepat Waktu (H): 15 menit sebelum matkul dimulai s/d 15 menit sesudah matkul dimulai
-        // Contoh Matkul 07:30 -> Hadir (H) dari 07:15 s/d 07:45
+        // Contoh Matkul Jam 07:30 -> Hadir (H) dari 07:15 s/d 07:45
         $windowStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
         $windowEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
 
         if ($time >= $windowStart && $time <= $windowEnd) {
-            return 'H'; // Hadir (H)
+            return 'H'; // Hadir Tepat Waktu (H)
         }
 
-        // Jika tap lewat dari 15 menit setelah matkul dimulai (> 07:45) -> Status Terlambat (T)
+        // Jika tap lewat dari 15 menit setelah matkul dimulai (misal > 07:45) -> Status Terlambat (T)
         if ($time > $windowEnd) {
             return 'T'; // Terlambat (T)
         }
@@ -179,7 +168,7 @@ class IotController extends Controller
             $kelasNama      = ($mahasiswa->kelas) ? $mahasiswa->kelas->nama_kelas : 'TI-3A';
             $jadwalId       = $jadwal ? $jadwal->id : 1;
             
-            $statusPresensiCode  = $this->calculateAttendanceStatus($currentJam);
+            $statusPresensiCode  = $this->calculateAttendanceStatus($currentJam, $jadwal);
             $statusPresensiLabel = ($statusPresensiCode === 'H') 
                 ? 'HADIR TEPAT WAKTU (H) 🟢' 
                 : 'TERLAMBAT (T) 🟡 (LEWAT DARI JADWAL MATKUL > 15 MIN)';
@@ -334,7 +323,7 @@ class IotController extends Controller
 
                 $jadwalId = $jadwal ? $jadwal->id : 1;
 
-                $calculatedStatus = $this->calculateAttendanceStatus($currentJam);
+                $calculatedStatus = $this->calculateAttendanceStatus($currentJam, $jadwal);
 
                 $jamStart = ($jadwal && $jadwal->jam_mulai) ? (int)$jadwal->jam_mulai : 1;
                 $jamEnd   = ($jadwal && $jadwal->jam_selesai) ? (int)$jadwal->jam_selesai : 4;
