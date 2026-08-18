@@ -139,6 +139,26 @@ class IotController extends Controller
                 ], 200);
             }
 
+            // Check if student has registered face photo
+            if (empty($mahasiswa->foto_wajah)) {
+                AuditLog::create([
+                    'tipe_log' => 'ACCESS_DENIED',
+                    'deskripsi' => "Presensi Ditolak: Mahasiswa {$mahasiswa->nama_lengkap} ({$mahasiswa->nim}) BELUM mendaftarkan foto wajah profil di database.",
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'status' => 'face_missing',
+                    'message' => "Presensi Gagal! Mahasiswa {$mahasiswa->nama_lengkap} BELUM mengunggah/mendaftarkan foto profil wajah di database web.",
+                    'mahasiswa' => [
+                        'id'           => $mahasiswa->id,
+                        'nim'          => $mahasiswa->nim,
+                        'nama_lengkap' => $mahasiswa->nama_lengkap,
+                        'foto_wajah'   => null,
+                    ]
+                ], 200);
+            }
+
             // 2. Determine Day and Time Slot
             $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             $todayName = $days[date('w')];
