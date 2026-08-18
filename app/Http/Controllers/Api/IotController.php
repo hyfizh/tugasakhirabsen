@@ -17,7 +17,7 @@ class IotController extends Controller
 {
     private function getCurrentJamPelajaran(): ?int
     {
-        $time = date('H:i');
+        $time = \Carbon\Carbon::now('Asia/Jakarta')->format('H:i');
         
         // Define lesson hours mapping (Jam 1: Kelas mulai 07:30, dibuka tap awal dari 07:00)
         $hours = [
@@ -45,7 +45,7 @@ class IotController extends Controller
 
     private function calculateAttendanceStatus(?int $currentJam, ?Jadwal $jadwal = null): string
     {
-        $time = date('H:i');
+        $time = \Carbon\Carbon::now('Asia/Jakarta')->format('H:i');
         
         $sessionStartTimes = [
             1  => '07:30', 2  => '08:20', 3  => '09:10', 4  => '10:10', 5  => '11:00',
@@ -71,7 +71,7 @@ class IotController extends Controller
             return 'T'; // Terlambat (T)
         }
 
-        return 'H';
+        return 'T'; // Default jika diluar window awal adalah Terlambat
     }
 
     public function heartbeat(Request $request)
