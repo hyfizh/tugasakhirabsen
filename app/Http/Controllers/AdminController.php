@@ -1138,10 +1138,28 @@ class AdminController extends Controller
             9  => 'September', 10 => 'Oktober',  11 => 'November', 12 => 'Desember'
         ];
 
-        $dateStr = sprintf('%04d-%02d-01', $tahun, $bulan);
-        $timestamp = strtotime($dateStr);
-        $monday = date('Y-m-d', strtotime('monday this week', $timestamp));
-        $saturday = date('Y-m-d', strtotime('saturday this week', $timestamp));
+        // Calculate Week Number (Minggu ke-1 s/d Minggu ke-4)
+        $currentMonth = (int) date('m');
+        $currentYear  = (int) date('Y');
+        
+        if ($request->has('minggu')) {
+            $minggu = (int) $request->input('minggu');
+        } else {
+            if ($bulan === $currentMonth && $tahun === $currentYear) {
+                $dayOfMonth = (int) date('j');
+                if ($dayOfMonth <= 7) $minggu = 1;
+                elseif ($dayOfMonth <= 14) $minggu = 2;
+                elseif ($dayOfMonth <= 21) $minggu = 3;
+                else $minggu = 4;
+            } else {
+                $minggu = 1;
+            }
+        }
+
+        $midWeekDay = ($minggu - 1) * 7 + 4;
+        $targetDate = sprintf('%04d-%02d-%02d', $tahun, $bulan, $midWeekDay);
+        $monday = date('Y-m-d', strtotime('monday this week', strtotime($targetDate)));
+        $saturday = date('Y-m-d', strtotime('+5 days', strtotime($monday)));
         
         $daysOfWeek = [
             'Senin'   => date('Y-m-d', strtotime($monday)),
@@ -1152,50 +1170,66 @@ class AdminController extends Controller
             'Sabtu'   => date('Y-m-d', strtotime('+5 days', strtotime($monday))),
         ];
 
-        $students = Mahasiswa::query()
-            ->where('kelas_id', $selectedKelasId)
-            ->orderBy('nama_lengkap')
-            ->get();
-
-        $studentIds = $students->pluck('id');
+        $students = [];
         $weeklyAbsensi = [];
         $weeklyTotals = [];
         $monthlyTotals = [];
 
-        if ($students->isNotEmpty()) {
-            $weeklyRecords = Absensi::query()
-                ->whereIn('mahasiswa_id', $studentIds)
-                ->whereBetween('tanggal', [$monday, $saturday])
+        if ($selectedKelasId) {
+            $students = Mahasiswa::query()
+                ->where('kelas_id', $selectedKelasId)
+                ->orderBy('nama_lengkap')
                 ->get();
 
-            foreach ($weeklyRecords as $rec) {
-                $dateKey = $rec->tanggal->format('Y-m-d');
-                $weeklyAbsensi[$rec->mahasiswa_id][$dateKey][$rec->jam_pelajaran_ke] = $rec->status;
-                if (in_array($rec->status, ['S', 'I', 'A'])) {
-                    $weeklyTotals[$rec->mahasiswa_id][$rec->status] = ($weeklyTotals[$rec->mahasiswa_id][$rec->status] ?? 0) + 1;
+            if ($students->isNotEmpty()) {
+                $studentIds = $students->pluck('id');
+
+                $weeklyQuery = Absensi::query()
+                    ->whereIn('mahasiswa_id', $studentIds)
+                    ->whereBetween('tanggal', [$monday, $saturday]);
+
+                if ($selectedMatkulId) {
+                    $weeklyQuery->whereHas('jadwal', function($q) use ($selectedMatkulId) {
+                        $q->where('mata_kuliah_id', $selectedMatkulId);
+                    });
                 }
-            }
+                $weeklyRecords = $weeklyQuery->get();
 
-            $monthlyRecords = Absensi::query()
-                ->whereIn('mahasiswa_id', $studentIds)
-                ->whereMonth('tanggal', $bulan)
-                ->whereYear('tanggal', $tahun)
-                ->get();
+                foreach ($weeklyRecords as $rec) {
+                    $dateKey = is_string($rec->tanggal) ? substr($rec->tanggal, 0, 10) : $rec->tanggal->format('Y-m-d');
+                    $weeklyAbsensi[$rec->mahasiswa_id][$dateKey][$rec->jam_pelajaran_ke] = $rec->status;
+                    if (in_array($rec->status, ['S', 'I', 'A'])) {
+                        $weeklyTotals[$rec->mahasiswa_id][$rec->status] = ($weeklyTotals[$rec->mahasiswa_id][$rec->status] ?? 0) + 1;
+                    }
+                }
 
-            foreach ($monthlyRecords as $rec) {
-                if (in_array($rec->status, ['S', 'I', 'A'])) {
-                    $monthlyTotals[$rec->mahasiswa_id][$rec->status] = ($monthlyTotals[$rec->mahasiswa_id][$rec->status] ?? 0) + 1;
+                $monthlyQuery = Absensi::query()
+                    ->whereIn('mahasiswa_id', $studentIds)
+                    ->whereMonth('tanggal', $bulan)
+                    ->whereYear('tanggal', $tahun);
+
+                if ($selectedMatkulId) {
+                    $monthlyQuery->whereHas('jadwal', function($q) use ($selectedMatkulId) {
+                        $q->where('mata_kuliah_id', $selectedMatkulId);
+                    });
+                }
+                $monthlyRecords = $monthlyQuery->get();
+
+                foreach ($monthlyRecords as $rec) {
+                    if (in_array($rec->status, ['S', 'I', 'A'])) {
+                        $monthlyTotals[$rec->mahasiswa_id][$rec->status] = ($monthlyTotals[$rec->mahasiswa_id][$rec->status] ?? 0) + 1;
+                    }
                 }
             }
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.laporan.rekap_pdf', compact(
-            'selectedKelas', 'bulan', 'tahun', 'monthsList', 'students',
+            'selectedKelas', 'bulan', 'tahun', 'minggu', 'monthsList', 'students',
             'weeklyAbsensi', 'weeklyTotals', 'monthlyTotals', 'daysOfWeek', 'rekapTab'
         ))->setPaper('a4', 'landscape');
 
         $namaKelasClean = str_replace(['/', '\\', ' '], '_', $selectedKelas->nama_kelas ?? 'Kelas');
-        $filename = 'Rekap_Presensi_' . $rekapTab . '_' . $namaKelasClean . '_' . $monthsList[$bulan] . '_' . $tahun . '.pdf';
+        $filename = 'Rekap_Presensi_' . $rekapTab . '_' . $namaKelasClean . '_' . $monthsList[$bulan] . '_' . $tahun . '_Minggu' . $minggu . '.pdf';
         
         if ($request->has('download')) {
             return $pdf->download($filename);
