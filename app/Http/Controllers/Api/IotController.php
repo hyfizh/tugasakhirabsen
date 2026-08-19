@@ -52,21 +52,19 @@ class IotController extends Controller
             6  => '11:50', 7  => '13:30', 8  => '14:20', 9  => '15:10', 10 => '16:00',
         ];
 
-        // Slot jam mulai perkuliahan
-        $jamIndex = ($jadwal && $jadwal->jam_mulai) ? (int)$jadwal->jam_mulai : ($currentJam ?? 1);
+        // Slot jam pelajaran aktif (atau jam_mulai)
+        $jamIndex = $currentJam ?? ($jadwal && $jadwal->jam_mulai ? (int)$jadwal->jam_mulai : 1);
         $startTime = $sessionStartTimes[$jamIndex] ?? '07:30';
 
-        // Window Time: Absen dibuka 15 menit sebelum jam_mulai dan ditutup 30 menit setelah jam_mulai (atau toleransi)
+        // Window Presensi: Dibuka 15m sebelum jam_mulai s/d 15m setelah jam_mulai (Contoh Jam 1 = 07:15 s/d 07:45)
         $windowStart = date('H:i', strtotime($startTime . ' - 15 minutes'));
-        $toleranceMins = ($jadwal && $jadwal->toleransi_keterlambatan) ? (int)$jadwal->toleransi_keterlambatan : 30;
-        if ($toleranceMins < 15) $toleranceMins = 30;
-        $windowEnd = date('H:i', strtotime($startTime . " + {$toleranceMins} minutes"));
+        $windowEnd   = date('H:i', strtotime($startTime . ' + 15 minutes'));
 
         if ($time >= $windowStart && $time <= $windowEnd) {
             return 'H'; // Hadir Tepat Waktu (H)
         }
 
-        // Diluar rentang toleransi presensi -> Ditolak (DENIED)
+        // Jika lewat dari 15m setelah jam_mulai (misal > 07:45) -> Ditolak (DENIED)
         return 'DENIED';
     }
 

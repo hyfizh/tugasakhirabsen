@@ -1658,19 +1658,17 @@ class AdminController extends Controller
             if ($jamEnd < $jamStart) $jamEnd = $jamStart + 2;
             if ($jamEnd > 10) $jamEnd = 10;
 
-            $startTime = $sessionStartTimes[$jamStart] ?? '07:30';
-            $toleranceMins = (int) ($jadwal->toleransi_keterlambatan ?? 30);
-            if ($toleranceMins < 15) $toleranceMins = 30;
+            $mahasiswas = Mahasiswa::where('kelas_id', $jadwal->kelas_id)->get();
 
-            // Batas waktu absen tutup (jam_mulai + toleransi keterlambatan)
-            $windowCloseTime = date('H:i', strtotime($startTime . " + {$toleranceMins} minutes"));
+            // Evaluasi per slot jam pelajaran (Jam 1, Jam 2, Jam 3, dsb)
+            for ($j = $jamStart; $j <= $jamEnd; $j++) {
+                $slotStartTime = $sessionStartTimes[$j] ?? '07:30';
+                // Tepat 15 menit setelah jam mulai slot tersebut (misal Jam 1: 07:30 + 15m = 07:45 WIB)
+                $slotCloseTime = date('H:i', strtotime($slotStartTime . ' + 15 minutes'));
 
-            // Otomatis tandai Alpa jika jendela waktu presensi sudah ditutup (misal > 08:00 WIB untuk Jam ke-1)
-            if ($currentTime > $windowCloseTime) {
-                $mahasiswas = Mahasiswa::where('kelas_id', $jadwal->kelas_id)->get();
-
-                foreach ($mahasiswas as $mhs) {
-                    for ($j = $jamStart; $j <= $jamEnd; $j++) {
+                // Jika waktu saat ini sudah melewati batas tutup absen slot jam ke-j (misal > 07:45 WIB)
+                if ($currentTime > $slotCloseTime) {
+                    foreach ($mahasiswas as $mhs) {
                         $exists = Absensi::where('mahasiswa_id', $mhs->id)
                             ->where('tanggal', $todayDate)
                             ->where('jam_pelajaran_ke', $j)
