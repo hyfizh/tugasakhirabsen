@@ -72,7 +72,7 @@ class AdminController extends Controller
                 'sn' => 'RPI3-2026-RFID-01',
                 'tipe' => 'RC522 RFID Reader',
                 'lokasi' => 'Stasiun Sensor Alat (Lab IoT TI)',
-                'ip_address' => '192.168.1.23',
+                'ip_address' => '10.63.208.14',
                 'mac_address' => 'B8:27:EB:41:89:A2',
                 'icon' => 'fa-id-card'
             ]);
@@ -82,7 +82,7 @@ class AdminController extends Controller
                 'sn' => 'RPI3-2026-CAM-01',
                 'tipe' => 'Pi Camera Biometrik Wajah',
                 'lokasi' => 'Stasiun Sensor Alat (Lab IoT TI)',
-                'ip_address' => '192.168.1.23',
+                'ip_address' => '10.63.208.14',
                 'mac_address' => 'B8:27:EB:41:89:A2',
                 'icon' => 'fa-camera'
             ]);
