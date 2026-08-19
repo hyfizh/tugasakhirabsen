@@ -806,6 +806,18 @@ class AdminController extends Controller
                 $path = 'profiles/' . $filename;
 
                 Storage::disk('public')->put($path, $data);
+
+                // VALIDASI WAJAH UNIK (1 ID = 1 WAJAH)
+                $tempAbsolutePath = storage_path('app/public/' . $path);
+                $duplicateMhs = $this->verifyUniqueFacePhoto($tempAbsolutePath, $mahasiswa->id);
+                if ($duplicateMhs) {
+                    Storage::disk('public')->delete($path);
+                    $errMsg = "Pendaftaran gagal: Wajah ini sudah terdaftar atas nama ID mahasiswa lain ({$duplicateMhs->nama_lengkap} - NIM: {$duplicateMhs->nim}).";
+                    if ($request->wantsJson()) {
+                        return response()->json(['success' => false, 'message' => $errMsg], 422);
+                    }
+                    return redirect()->back()->with('error', $errMsg);
+                }
             } else {
                 if ($request->wantsJson()) {
                     return response()->json(['success' => false, 'message' => 'Format gambar Base64 tidak valid.'], 422);
@@ -1480,7 +1492,15 @@ class AdminController extends Controller
     // --- SETTINGS ---
     public function settings()
     {
-        return view('admin.settings');
+        $thresholds = \App\Models\SpThreshold::orderBy('sp_level', 'asc')->get();
+        if ($thresholds->isEmpty()) {
+            $thresholds = collect([
+                (object)['sp_level' => 1, 'min_alpha' => 10, 'judul_sp' => 'Surat Peringatan 1'],
+                (object)['sp_level' => 2, 'min_alpha' => 30, 'judul_sp' => 'Surat Peringatan 2'],
+                (object)['sp_level' => 3, 'min_alpha' => 50, 'judul_sp' => 'Surat Peringatan 3'],
+            ]);
+        }
+        return view('admin.settings', compact('thresholds'));
     }
 
     public function updateSettings(Request $request)
@@ -1491,6 +1511,179 @@ class AdminController extends Controller
         ]);
         
         return redirect()->route('admin.settings')->with('success', 'Pengaturan sistem EduAttend IoT berhasil diperbarui.');
+    }
+
+    public function updateSpThresholds(Request $request)
+    {
+        $request->validate([
+            'thresholds' => 'required|array',
+            'thresholds.*.min_alpha' => 'required|integer|min:1|max:200',
+        ]);
+
+        foreach ($request->thresholds as $spLevel => $data) {
+            \App\Models\SpThreshold::updateOrCreate(
+                ['sp_level' => (int) $spLevel],
+                [
+                    'min_alpha' => (int) $data['min_alpha'],
+                    'judul_sp'  => "Surat Peringatan {$spLevel}",
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        AuditLog::create([
+            'tipe_log'   => 'SP_THRESHOLDS_UPDATED',
+            'deskripsi'  => 'Admin memperbarui konfigurasi nilai threshold minimum jam Alpa untuk SP 1, SP 2, dan SP 3',
+            'ip_address' => $request->ip(),
+        ]);
+
+        return redirect()->back()->with('success', 'Konfigurasi threshold SP otomatis berhasil diperbarui!');
+    }
+
+    public function verifyUniqueFacePhoto(string $imageAbsolutePath, int $currentStudentId): ?Mahasiswa
+    {
+        if (!file_exists($imageAbsolutePath)) return null;
+
+        $getSmallGrayscaleMatrix = function($path) {
+            $info = @getimagesize($path);
+            if (!$info) return null;
+            $mime = $info['mime'];
+            if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
+                $src = @imagecreatefromjpeg($path);
+            } elseif ($mime === 'image/png') {
+                $src = @imagecreatefrompng($path);
+            } else {
+                return null;
+            }
+            if (!$src) return null;
+
+            $width = imagesx($src);
+            $height = imagesy($src);
+
+            $resized = imagecreatetruecolor(32, 32);
+            imagecopyresampled($resized, $src, 0, 0, 0, 0, 32, 32, $width, $height);
+            imagefilter($resized, IMG_FILTER_GRAYSCALE);
+
+            $matrix = [];
+            for ($y = 0; $y < 32; $y++) {
+                for ($x = 0; $x < 32; $x++) {
+                    $rgb = imagecolorat($resized, $x, $y);
+                    $r = ($rgb >> 16) & 0xFF;
+                    $matrix[] = $r;
+                }
+            }
+            imagedestroy($src);
+            imagedestroy($resized);
+            return $matrix;
+        };
+
+        $newMatrix = $getSmallGrayscaleMatrix($imageAbsolutePath);
+        if (!$newMatrix) return null;
+
+        $otherStudents = Mahasiswa::whereNotNull('foto_wajah')
+            ->where('foto_wajah', '!=', '')
+            ->where('id', '!=', $currentStudentId)
+            ->get();
+
+        foreach ($otherStudents as $other) {
+            $otherPath = storage_path('app/public/' . $other->foto_wajah);
+            if (!file_exists($otherPath)) continue;
+
+            $otherMatrix = $getSmallGrayscaleMatrix($otherPath);
+            if (!$otherMatrix || count($otherMatrix) !== count($newMatrix)) continue;
+
+            $totalDiff = 0;
+            $count = count($newMatrix);
+            for ($i = 0; $i < $count; $i++) {
+                $totalDiff += abs($newMatrix[$i] - $otherMatrix[$i]);
+            }
+            $avgDiff = $totalDiff / $count;
+
+            if ($avgDiff < 25.0) {
+                return $other;
+            }
+        }
+
+        return null;
+    }
+
+    public static function checkAndSendAutoSpEmail(Mahasiswa $mahasiswa)
+    {
+        if (empty($mahasiswa->email) || !filter_var($mahasiswa->email, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $totalAlpaHours = Absensi::where('mahasiswa_id', $mahasiswa->id)
+            ->where('status', 'A')
+            ->count();
+
+        $thresholds = \App\Models\SpThreshold::where('is_active', true)
+            ->orderBy('sp_level', 'asc')
+            ->get();
+
+        foreach ($thresholds as $th) {
+            if ($totalAlpaHours >= $th->min_alpha) {
+                $sp = SuratPeringatan::where('mahasiswa_id', $mahasiswa->id)
+                    ->where('tingkat_sp', $th->sp_level)
+                    ->first();
+
+                if (!$sp) {
+                    $sp = SuratPeringatan::create([
+                        'mahasiswa_id'   => $mahasiswa->id,
+                        'tingkat_sp'     => $th->sp_level,
+                        'total_jam_alpa' => $totalAlpaHours,
+                        'status'         => 'Aktif',
+                    ]);
+                }
+
+                if (empty($sp->email_sent_at)) {
+                    try {
+                        $totalIzinHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'I')->count();
+                        $totalSakitHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'S')->count();
+                        $compensationPenalty = ($totalAlpaHours * 2) + ($totalIzinHours * 1);
+                        $spLevel = $th->sp_level;
+                        $spTitle = $th->judul_sp;
+
+                        $pdfContent = null;
+                        try {
+                            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.laporan.sp_letter_pdf', [
+                                'mahasiswa'           => $mahasiswa,
+                                'totalAlpaHours'      => $totalAlpaHours,
+                                'compensationPenalty' => $compensationPenalty,
+                                'spLevel'             => $spLevel,
+                                'spTitle'             => $spTitle,
+                                'spRoman'             => ($spLevel == 1 ? 'I' : ($spLevel == 2 ? 'II' : 'III')),
+                                'nomorSurat'          => '574/PL9.5/AK/' . date('Y'),
+                                'tanggalSurat'        => date('d F Y'),
+                                'mingguKe'            => 3,
+                                'tanggalAkhirHitung'  => date('d F Y'),
+                                'semesterTipe'        => 'Ganjil',
+                                'tahunAkademik'       => date('Y') . '/' . (date('Y') + 1),
+                                'pejabatNama'         => 'Dr. Rikki Vita Sarsan, S.T., M.T.',
+                                'pejabatNip'          => '19750812 200212 1 002',
+                            ])->setPaper('a4', 'portrait');
+                            $pdfContent = $pdf->output();
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error("Auto SP PDF generation error: " . $e->getMessage());
+                        }
+
+                        \Illuminate\Support\Facades\Mail::to($mahasiswa->email)->send(new \App\Mail\SuratPeringatanMail(
+                            $mahasiswa, $spLevel, $spTitle, $totalAlpaHours, $compensationPenalty, $pdfContent
+                        ));
+
+                        $sp->update(['email_sent_at' => now()]);
+
+                        AuditLog::create([
+                            'tipe_log'   => 'AUTO_SP_EMAIL_SENT',
+                            'deskripsi'  => "Otomatis mengirimkan Surat Peringatan ({$spTitle}) ke email terverifikasi {$mahasiswa->email} (NIM: {$mahasiswa->nim}, Total Alpa: {$totalAlpaHours} Jam)",
+                            'ip_address' => '127.0.0.1',
+                        ]);
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed auto sending SP Email: " . $e->getMessage());
+                    }
+                }
+            }
+        }
     }
 
     // --- MANAJEMEN PERANGKAT IOT HARDWARE CRUD ---
@@ -1717,6 +1910,7 @@ class AdminController extends Controller
                                 'status'           => 'A',
                                 'waktu_tap_rfid'   => null,
                             ]);
+                            self::checkAndSendAutoSpEmail($mhs);
                         }
                     }
                 }

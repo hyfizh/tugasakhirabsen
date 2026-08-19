@@ -67,6 +67,42 @@
                         </button>
                     </div>
                 </form>
+
+                <hr class="border-slate-100 my-6">
+
+                <!-- FORM KONFIGURASI THRESHOLD SP OTOMATIS -->
+                <form action="{{ route('admin.sp-thresholds.update') }}" method="POST" class="space-y-5">
+                    @csrf
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900 tracking-tight flex items-center">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2 text-sm"></i> Konfigurasi Threshold Surat Peringatan (SP) Otomatis
+                        </h3>
+                        <p class="text-xs text-slate-400 font-medium mt-0.5">Tentukan batas minimum jam Alpa untuk memicu pembuatan dan pengiriman email SP secara otomatis.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        @foreach ($thresholds as $th)
+                            <div class="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-extrabold text-slate-800">SP Level {{ $th->sp_level }}</span>
+                                    <span class="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-100 text-amber-800">SP {{ $th->sp_level }}</span>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Minimum Alpa (Jam)</label>
+                                    <input type="number" name="thresholds[{{ $th->sp_level }}][min_alpha]" value="{{ $th->min_alpha }}" required min="1" max="200"
+                                           class="w-full rounded-xl border border-slate-300 shadow-sm text-xs font-bold text-slate-900 p-2.5 focus:ring-2 focus:ring-amber-500 outline-none">
+                                </div>
+                                <p class="text-[10px] text-slate-400 font-medium">Jika total Alpa &ge; {{ $th->min_alpha }} jam ➔ Pemicu SP {{ $th->sp_level }} Email</p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="pt-2 flex justify-end">
+                        <button type="submit" class="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center">
+                            <i class="fa-solid fa-bell mr-2"></i> Simpan Threshold SP
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- Right Column (4 cols): System Status & Security Badge -->

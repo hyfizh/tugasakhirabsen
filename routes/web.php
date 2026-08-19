@@ -94,9 +94,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::delete('/perangkat/{perangkat}', [AdminController::class, 'destroyPerangkat'])->name('perangkat.destroy');
     Route::get('/perangkat/{id}/ping', [AdminController::class, 'pingPerangkat'])->name('perangkat.ping');
 
-    // Settings
+    // Settings & SP Thresholds
     Route::get('/settings', [AdminController::class, 'settings'])->name('settings');
     Route::post('/settings', [AdminController::class, 'updateSettings'])->name('settings.update');
+    Route::post('/sp-thresholds', [AdminController::class, 'updateSpThresholds'])->name('sp-thresholds.update');
 
     // Permohonan Ganti Foto Mahasiswa
     Route::get('/permohonan-foto', [AdminController::class, 'indexPermohonanFoto'])->name('permohonan-foto.index');

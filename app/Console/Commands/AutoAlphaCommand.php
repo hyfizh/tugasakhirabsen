@@ -84,6 +84,9 @@ class AutoAlphaCommand extends Command
                                 'waktu_tap_rfid'   => null,
                             ]);
                             $totalAlphaAdded++;
+
+                            // Otomatis cek & kirim email SP jika alpa mahasiswa mencapai threshold SP 1, 2, atau 3
+                            \App\Http\Controllers\AdminController::checkAndSendAutoSpEmail($mhs);
                         }
                     }
                 }
