@@ -151,10 +151,17 @@
                     <button type="button" @click="openModal = true" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-sm hover:shadow-md transition-all inline-flex items-center">
                         <i class="fa-solid fa-file-medical mr-2 text-sm"></i> Ubah Status Absensi (Sakit / Izin)
                     </button>
+                    <!-- Preview PDF (Stream di Tab Baru Browser) -->
+                    <a :href="'{{ route('admin.laporan.rekap.download-pdf') }}?kelas_id={{ $selectedKelasId }}&mata_kuliah_id={{ $selectedMatkulId }}&bulan={{ $bulan }}&tahun={{ $tahun }}&minggu={{ $minggu }}&type=' + rekapTab" 
+                       target="_blank"
+                       class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md hover:shadow-lg transition-all inline-flex items-center">
+                        <i class="fa-solid fa-eye mr-2 text-sm"></i> Preview PDF
+                    </a>
+                    <!-- Download Direct PDF File -->
                     <a :href="'{{ route('admin.laporan.rekap.download-pdf') }}?kelas_id={{ $selectedKelasId }}&mata_kuliah_id={{ $selectedMatkulId }}&bulan={{ $bulan }}&tahun={{ $tahun }}&minggu={{ $minggu }}&type=' + rekapTab + '&download=1'" 
                        target="_blank"
                        class="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md hover:shadow-lg transition-all inline-flex items-center">
-                        <i class="fa-solid fa-file-pdf mr-2 text-sm"></i> Download PDF
+                        <i class="fa-solid fa-download mr-2 text-sm"></i> Download PDF
                     </a>
                 </div>
             </div>
