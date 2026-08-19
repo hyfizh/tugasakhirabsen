@@ -867,49 +867,40 @@ class AdminController extends Controller
             $query->with('jadwal');
         }])->get();
 
-        $kompenData = $students->map(function ($student) {
+        $th1 = \App\Models\SpThreshold::where('sp_level', 1)->value('min_alpha') ?? 10;
+        $th2 = \App\Models\SpThreshold::where('sp_level', 2)->value('min_alpha') ?? 30;
+        $th3 = \App\Models\SpThreshold::where('sp_level', 3)->value('min_alpha') ?? 50;
+
+        $kompenData = $students->map(function ($student) use ($th1, $th2, $th3) {
             $totalAlpaHours = 0;
             $totalIzinHours = 0;
             $totalSakitHours = 0;
-            $compensationPenalty = 0;
 
             foreach ($student->absensis as $abs) {
-                $hours = 1;
-                if ($abs->jadwal) {
-                    $hours = ($abs->jadwal->jam_selesai - $abs->jadwal->jam_mulai) + 1;
-                }
-
                 if ($abs->status === 'A') {
-                    $totalAlpaHours += $hours;
-                    $compensationPenalty += $hours * 2;
-                } elseif ($abs->status === 'T') {
-                    // Jika mahasiswa datang di jam ke-2 atau lebih pada matakuliah multi-jam (terlambat), jam ke-1 yang dilewati terhitung Alpa
-                    if ($abs->jadwal && $abs->jam_pelajaran_ke > $abs->jadwal->jam_mulai) {
-                        $missedHours = $abs->jam_pelajaran_ke - $abs->jadwal->jam_mulai;
-                        $totalAlpaHours += $missedHours;
-                        $compensationPenalty += $missedHours * 2;
-                    }
+                    $totalAlpaHours++;
                 } elseif ($abs->status === 'I') {
-                    $totalIzinHours += $hours;
-                    $compensationPenalty += $hours * 1;
+                    $totalIzinHours++;
                 } elseif ($abs->status === 'S') {
-                    $totalSakitHours += $hours;
-                    $compensationPenalty += $hours * 0;
+                    $totalSakitHours++;
                 }
             }
 
-            // Assign / check SP level based on total Alpa hours
+            // Perhitungan Jam Kompen: Alpa x2, Izin x1, Sakit x0
+            $compensationPenalty = ($totalAlpaHours * 2) + ($totalIzinHours * 1) + ($totalSakitHours * 0);
+
+            // Perhitungan SP Berdasarkan Total Alpa vs Threshold
             $spLevel = 0;
             $spStatus = 'Aman';
-            if ($totalAlpaHours >= 10 && $totalAlpaHours < 30) {
-                $spLevel = 1;
-                $spStatus = 'SP 1 (Peringatan Awal)';
-            } elseif ($totalAlpaHours >= 30 && $totalAlpaHours < 50) {
-                $spLevel = 2;
-                $spStatus = 'SP 2 (Peringatan Keras)';
-            } elseif ($totalAlpaHours >= 50) {
+            if ($totalAlpaHours >= $th3) {
                 $spLevel = 3;
-                $spStatus = 'SP 3 (Terancam Drop Out)';
+                $spStatus = "SP 3 (>= {$th3} Jam Alpa)";
+            } elseif ($totalAlpaHours >= $th2) {
+                $spLevel = 2;
+                $spStatus = "SP 2 (>= {$th2} Jam Alpa)";
+            } elseif ($totalAlpaHours >= $th1) {
+                $spLevel = 1;
+                $spStatus = "SP 1 (>= {$th1} Jam Alpa)";
             }
 
             // Sync SP to database table if needed
@@ -919,7 +910,6 @@ class AdminController extends Controller
                     ['tingkat_sp' => $spLevel, 'total_jam_alpa' => $totalAlpaHours]
                 );
             } else {
-                // If student returns to safe hours, mark previous active SP as 'Selesai'
                 SuratPeringatan::query()->where('mahasiswa_id', $student->id)
                     ->where('status', 'Aktif')
                     ->update(['status' => 'Selesai']);
@@ -1253,50 +1243,33 @@ class AdminController extends Controller
     // --- CETAK SURAT PERINGATAN II & III ---
     public function cetakSp(Request $request, Mahasiswa $mahasiswa)
     {
-        $mahasiswa->load(['kelas', 'absensis' => function ($query) {
-            $query->with('jadwal');
-        }]);
+        $totalAlpaHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'A')->count();
+        $totalIzinHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'I')->count();
+        $totalSakitHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'S')->count();
 
-        $totalAlpaHours = 0;
-        $totalIzinHours = 0;
-        $totalSakitHours = 0;
-        $compensationPenalty = 0;
+        // Kompen: Alpa x2, Izin x1, Sakit x0
+        $compensationPenalty = ($totalAlpaHours * 2) + ($totalIzinHours * 1) + ($totalSakitHours * 0);
 
-        foreach ($mahasiswa->absensis as $abs) {
-            $hours = 1;
-            if ($abs->jadwal) {
-                $hours = ($abs->jadwal->jam_selesai - $abs->jadwal->jam_mulai) + 1;
-            }
+        // Dynamic Threshold SP
+        $th1 = \App\Models\SpThreshold::where('sp_level', 1)->value('min_alpha') ?? 10;
+        $th2 = \App\Models\SpThreshold::where('sp_level', 2)->value('min_alpha') ?? 30;
+        $th3 = \App\Models\SpThreshold::where('sp_level', 3)->value('min_alpha') ?? 50;
 
-            if ($abs->status === 'A') {
-                $totalAlpaHours += $hours;
-                $compensationPenalty += $hours * 2;
-            } elseif ($abs->status === 'I') {
-                $totalIzinHours += $hours;
-                $compensationPenalty += $hours * 1;
-            } elseif ($abs->status === 'S') {
-                $totalSakitHours += $hours;
-                $compensationPenalty += $hours * 0;
-            }
-        }
-
-        // Determine SP Level
         $spLevel = 0;
         $spTitle = '';
-        if ($totalAlpaHours >= 10 && $totalAlpaHours < 30) {
-            $spLevel = 1;
-            $spTitle = 'Surat Peringatan 1';
-        } elseif ($totalAlpaHours >= 30 && $totalAlpaHours < 50) {
-            $spLevel = 2;
-            $spTitle = 'Surat Peringatan 2';
-        } elseif ($totalAlpaHours >= 50) {
+        if ($totalAlpaHours >= $th3) {
             $spLevel = 3;
             $spTitle = 'Surat Peringatan 3';
+        } elseif ($totalAlpaHours >= $th2) {
+            $spLevel = 2;
+            $spTitle = 'Surat Peringatan 2';
+        } elseif ($totalAlpaHours >= $th1) {
+            $spLevel = 1;
+            $spTitle = 'Surat Peringatan 1';
         }
 
-        // Only allow printing warning letters for SP 1, SP 2, and SP 3
         if ($spLevel < 1) {
-            return redirect()->back()->with('error', 'Cetak Surat Peringatan hanya diizinkan untuk mahasiswa yang telah memiliki akumulasi Alpa minimal 10 Jam (SP I, SP II, atau SP III).');
+            return redirect()->back()->with('error', "Cetak Surat Peringatan hanya diizinkan untuk mahasiswa yang telah memiliki akumulasi Alpa minimal {$th1} Jam (SP 1, SP 2, atau SP 3).");
         }
 
         return view('admin.laporan.sp_letter', compact('mahasiswa', 'totalAlpaHours', 'compensationPenalty', 'spLevel', 'spTitle'));
@@ -1304,48 +1277,33 @@ class AdminController extends Controller
 
     public function downloadSpPdf(Mahasiswa $mahasiswa)
     {
-        $mahasiswa->load(['kelas', 'absensis' => function ($query) {
-            $query->with('jadwal');
-        }]);
+        $totalAlpaHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'A')->count();
+        $totalIzinHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'I')->count();
+        $totalSakitHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'S')->count();
 
-        $totalAlpaHours = 0;
-        $totalIzinHours = 0;
-        $totalSakitHours = 0;
-        $compensationPenalty = 0;
+        // Kompen: Alpa x2, Izin x1, Sakit x0
+        $compensationPenalty = ($totalAlpaHours * 2) + ($totalIzinHours * 1) + ($totalSakitHours * 0);
 
-        foreach ($mahasiswa->absensis as $abs) {
-            $hours = 1;
-            if ($abs->jadwal) {
-                $hours = ($abs->jadwal->jam_selesai - $abs->jadwal->jam_mulai) + 1;
-            }
-
-            if ($abs->status === 'A') {
-                $totalAlpaHours += $hours;
-                $compensationPenalty += $hours * 2;
-            } elseif ($abs->status === 'I') {
-                $totalIzinHours += $hours;
-                $compensationPenalty += $hours * 1;
-            } elseif ($abs->status === 'S') {
-                $totalSakitHours += $hours;
-                $compensationPenalty += $hours * 0;
-            }
-        }
+        // Dynamic Threshold SP
+        $th1 = \App\Models\SpThreshold::where('sp_level', 1)->value('min_alpha') ?? 10;
+        $th2 = \App\Models\SpThreshold::where('sp_level', 2)->value('min_alpha') ?? 30;
+        $th3 = \App\Models\SpThreshold::where('sp_level', 3)->value('min_alpha') ?? 50;
 
         $spLevel = 0;
         $spTitle = '';
-        if ($totalAlpaHours >= 10 && $totalAlpaHours < 30) {
-            $spLevel = 1;
-            $spTitle = 'Surat Peringatan 1';
-        } elseif ($totalAlpaHours >= 30 && $totalAlpaHours < 50) {
-            $spLevel = 2;
-            $spTitle = 'Surat Peringatan 2';
-        } elseif ($totalAlpaHours >= 50) {
+        if ($totalAlpaHours >= $th3) {
             $spLevel = 3;
             $spTitle = 'Surat Peringatan 3';
+        } elseif ($totalAlpaHours >= $th2) {
+            $spLevel = 2;
+            $spTitle = 'Surat Peringatan 2';
+        } elseif ($totalAlpaHours >= $th1) {
+            $spLevel = 1;
+            $spTitle = 'Surat Peringatan 1';
         }
 
         if ($spLevel < 1) {
-            return redirect()->back()->with('error', 'Cetak Surat Peringatan hanya diizinkan untuk mahasiswa yang memiliki akumulasi Alpa minimal 10 Jam.');
+            return redirect()->back()->with('error', "Cetak Surat Peringatan hanya diizinkan untuk mahasiswa yang memiliki akumulasi Alpa minimal {$th1} Jam.");
         }
 
         $spRoman = $spLevel == 1 ? 'I' : ($spLevel == 2 ? 'II' : 'III');
@@ -1396,42 +1354,33 @@ class AdminController extends Controller
             return redirect()->back()->with('error', "SP diterbitkan di sistem, tetapi GAGAL TERKIRIM via email karena Mahasiswa ({$mahasiswa->nama_lengkap}) belum melengkapi & memverifikasi alamat emailnya.");
         }
 
-        $mahasiswa->load(['kelas', 'absensis' => function ($query) {
-            $query->with('jadwal');
-        }]);
+        $totalAlpaHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'A')->count();
+        $totalIzinHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'I')->count();
+        $totalSakitHours = Absensi::where('mahasiswa_id', $mahasiswa->id)->where('status', 'S')->count();
 
-        $totalAlpaHours = 0;
-        $compensationPenalty = 0;
+        // Kompen: Alpa x2, Izin x1, Sakit x0
+        $compensationPenalty = ($totalAlpaHours * 2) + ($totalIzinHours * 1) + ($totalSakitHours * 0);
 
-        foreach ($mahasiswa->absensis as $abs) {
-            $hours = 1;
-            if ($abs->jadwal) {
-                $hours = ($abs->jadwal->jam_selesai - $abs->jadwal->jam_mulai) + 1;
-            }
-
-            if ($abs->status === 'A') {
-                $totalAlpaHours += $hours;
-                $compensationPenalty += $hours * 2;
-            } elseif ($abs->status === 'I') {
-                $compensationPenalty += $hours * 1;
-            }
-        }
+        // Dynamic Threshold SP
+        $th1 = \App\Models\SpThreshold::where('sp_level', 1)->value('min_alpha') ?? 10;
+        $th2 = \App\Models\SpThreshold::where('sp_level', 2)->value('min_alpha') ?? 30;
+        $th3 = \App\Models\SpThreshold::where('sp_level', 3)->value('min_alpha') ?? 50;
 
         $spLevel = 0;
         $spTitle = '';
-        if ($totalAlpaHours >= 10 && $totalAlpaHours < 30) {
-            $spLevel = 1;
-            $spTitle = 'Surat Peringatan 1';
-        } elseif ($totalAlpaHours >= 30 && $totalAlpaHours < 50) {
-            $spLevel = 2;
-            $spTitle = 'Surat Peringatan 2';
-        } elseif ($totalAlpaHours >= 50) {
+        if ($totalAlpaHours >= $th3) {
             $spLevel = 3;
             $spTitle = 'Surat Peringatan 3';
+        } elseif ($totalAlpaHours >= $th2) {
+            $spLevel = 2;
+            $spTitle = 'Surat Peringatan 2';
+        } elseif ($totalAlpaHours >= $th1) {
+            $spLevel = 1;
+            $spTitle = 'Surat Peringatan 1';
         }
 
         if ($spLevel < 1) {
-            return redirect()->back()->with('error', "Mahasiswa ({$mahasiswa->nama_lengkap}) belum memenuhi ambang batas minimal Alpa (10 Jam) untuk penerbitan SP.");
+            return redirect()->back()->with('error', "Mahasiswa ({$mahasiswa->nama_lengkap}) belum memenuhi ambang batas minimal Alpa ({$th1} Jam) untuk penerbitan SP.");
         }
 
         $spRoman = $spLevel == 1 ? 'I' : ($spLevel == 2 ? 'II' : 'III');
