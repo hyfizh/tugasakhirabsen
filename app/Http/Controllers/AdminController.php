@@ -1641,9 +1641,9 @@ class AdminController extends Controller
         $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         $todayName = $days[date('w')];
 
-        $sessionEndTimes = [
-            1  => '08:20', 2  => '09:10', 3  => '10:00', 4  => '11:00', 5  => '11:50',
-            6  => '12:40', 7  => '14:20', 8  => '15:10', 9  => '16:00', 10 => '16:50',
+        $sessionStartTimes = [
+            1  => '07:30', 2  => '08:20', 3  => '09:10', 4  => '10:10', 5  => '11:00',
+            6  => '11:50', 7  => '13:30', 8  => '14:20', 9  => '15:10', 10 => '16:00',
         ];
 
         $jadwalQuery = Jadwal::where('hari', $todayName);
@@ -1653,15 +1653,21 @@ class AdminController extends Controller
         $jadwals = $jadwalQuery->get();
 
         foreach ($jadwals as $jadwal) {
-            $jamEndIndex = (int) ($jadwal->jam_selesai ?? $jadwal->jam_mulai ?? 4);
-            $endTime = $sessionEndTimes[$jamEndIndex] ?? '11:00';
+            $jamStart = (int) ($jadwal->jam_mulai ?? 1);
+            $jamEnd   = (int) ($jadwal->jam_selesai ?? $jamStart);
+            if ($jamEnd < $jamStart) $jamEnd = $jamStart + 2;
+            if ($jamEnd > 10) $jamEnd = 10;
 
-            if ($currentTime > $endTime) {
+            $startTime = $sessionStartTimes[$jamStart] ?? '07:30';
+            $toleranceMins = (int) ($jadwal->toleransi_keterlambatan ?? 30);
+            if ($toleranceMins < 15) $toleranceMins = 30;
+
+            // Batas waktu absen tutup (jam_mulai + toleransi keterlambatan)
+            $windowCloseTime = date('H:i', strtotime($startTime . " + {$toleranceMins} minutes"));
+
+            // Otomatis tandai Alpa jika jendela waktu presensi sudah ditutup (misal > 08:00 WIB untuk Jam ke-1)
+            if ($currentTime > $windowCloseTime) {
                 $mahasiswas = Mahasiswa::where('kelas_id', $jadwal->kelas_id)->get();
-                $jamStart = (int) ($jadwal->jam_mulai ?? 1);
-                $jamEnd   = (int) ($jadwal->jam_selesai ?? 4);
-                if ($jamEnd < $jamStart) $jamEnd = $jamStart + 3;
-                if ($jamEnd > 10) $jamEnd = 10;
 
                 foreach ($mahasiswas as $mhs) {
                     for ($j = $jamStart; $j <= $jamEnd; $j++) {
