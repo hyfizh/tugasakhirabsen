@@ -1831,15 +1831,25 @@ class AdminController extends Controller
         foreach ($jadwals as $jadwal) {
             $jamStart = (int) ($jadwal->jam_mulai ?? 1);
             $jamEnd   = (int) ($jadwal->jam_selesai ?? $jamStart);
-            if ($jamEnd < $jamStart) $jamEnd = $jamStart + 2;
+            if ($jamEnd < $jamStart) $jamEnd = $jamStart;
             if ($jamEnd > 10) $jamEnd = 10;
+
+            // ATURAN 2: Cek apakah ada minimal 1 mahasiswa di kelas yang tap / absen untuk jadwal matkul ini.
+            // Jika 0 mahasiswa yang absen (dosen tidak masuk / kelas ditiadakan), maka DIANGGAP TIDAK ADA PERKULIAHAN (Jangan buat Alpa).
+            $hasClassAttendance = Absensi::where('jadwal_id', $jadwal->id)
+                ->where('tanggal', $todayDate)
+                ->exists();
+
+            if (!$hasClassAttendance) {
+                // Tidak ada aktivitas presensi di kelas pada matkul ini -> Skip Auto Alpha
+                continue;
+            }
 
             $mahasiswas = Mahasiswa::where('kelas_id', $jadwal->kelas_id)->get();
 
-            // Evaluasi per slot jam pelajaran (Jam 1, Jam 2, Jam 3, dsb)
+            // ATURAN 1: Evaluasi HANYA pada slot jam pelajaran yang terdaftar pada JADWAL (jam_mulai s/d jam_selesai)
             for ($j = $jamStart; $j <= $jamEnd; $j++) {
                 $slotStartTime = $sessionStartTimes[$j] ?? '07:30';
-                // Tepat 15 menit setelah jam mulai slot tersebut (misal Jam 1: 07:30 + 15m = 07:45 WIB)
                 $slotCloseTime = date('H:i', strtotime($slotStartTime . ' + 15 minutes'));
 
                 // Jika waktu saat ini sudah melewati batas tutup absen slot jam ke-j (misal > 07:45 WIB)
